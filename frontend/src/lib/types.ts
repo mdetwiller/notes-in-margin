@@ -159,3 +159,15 @@ export interface MemoResponse {
   unmapped: MemoEntry[];
   starred_unassigned: MemoStarredUnassignedGroup[];
 }
+
+export interface NextStepSuggestion {
+  id: number;
+  research_question_id: number | null;
+  suggested_direction: string | null;
+  recommended_conversation_id: number | null;
+  recommended_conversation_title: string | null;
+  rationale: string;
+  status: "suggested" | "accepted" | "dismissed";
+  ai_metadata: { model: string; reasoning_effort: string; prompt: string } | null;
+  created_at: string;
+}

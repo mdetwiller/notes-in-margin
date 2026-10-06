@@ -9,7 +9,17 @@ from fastapi.staticfiles import StaticFiles
 from . import models_prototype  # noqa: F401 — registers tables on PrototypeBase
 from .config import get_config
 from .db import PrototypeBase, PrototypeSession, prototype_engine
-from .routers import checkpoints, conversations, highlights, memo, research_questions, review, settings, voice_memos
+from .routers import (
+    checkpoints,
+    conversations,
+    highlights,
+    memo,
+    next_steps,
+    research_questions,
+    review,
+    settings,
+    voice_memos,
+)
 from .seed import seed_research_questions
 
 config = get_config()
@@ -41,6 +51,7 @@ app.include_router(research_questions.router)
 app.include_router(voice_memos.router)
 app.include_router(review.router)
 app.include_router(memo.router)
+app.include_router(next_steps.router)
 app.include_router(settings.router)
 
 

@@ -30,7 +30,6 @@ class VoiceMemoConfig(BaseModel):
 class Config(BaseModel):
     default_user_id: int
     default_project_id: int
-    scoped_conversation_ids: list[int]
     cortico_db_path: str
     prototype_db_path: str
     audio_dir: str

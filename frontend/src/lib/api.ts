@@ -4,6 +4,7 @@ import type {
   ConversationSummary,
   Highlight,
   MemoResponse,
+  NextStepSuggestion,
   ResearchQuestion,
   ReviewResult,
   VoiceMemo,
@@ -85,6 +86,12 @@ export const api = {
   editMemoEntry: (connectionId: number, body: { insight_text?: string; evidence?: ConnectionEvidence[] }) =>
     request(`/memo/connections/${connectionId}`, { method: "PATCH", body: JSON.stringify(body) }),
   retractMemoEntry: (connectionId: number) => request(`/memo/connections/${connectionId}/retract`, { method: "POST" }),
+
+  generateNextSteps: () => request<NextStepSuggestion[]>("/next_steps/generate", { method: "POST" }),
+  listNextSteps: (includeDismissed = false) =>
+    request<NextStepSuggestion[]>(`/next_steps?include_dismissed=${includeDismissed}`),
+  acceptNextStep: (id: number) => request(`/next_steps/${id}/accept`, { method: "POST" }),
+  dismissNextStep: (id: number) => request(`/next_steps/${id}/dismiss`, { method: "POST" }),
 
   getReviewPrompt: () => request<{ text: string; default_text: string }>("/settings/review-prompt"),
   saveReviewPrompt: (text: string) =>

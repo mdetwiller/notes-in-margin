@@ -19,12 +19,7 @@ config = get_config()
 
 @router.get("")
 def list_conversations(cortico_db: Session = Depends(get_cortico_db)):
-    conversations = (
-        cortico_db.query(Conversation)
-        .filter(Conversation.id.in_(config.scoped_conversation_ids))
-        .order_by(Conversation.id)
-        .all()
-    )
+    conversations = cortico_db.query(Conversation).order_by(Conversation.id).all()
     return [
         {
             "id": c.id,

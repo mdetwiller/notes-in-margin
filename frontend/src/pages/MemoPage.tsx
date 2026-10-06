@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, audioUrlFor } from "../lib/api";
-import type { MemoEntry, MemoResponse } from "../lib/types";
+import type { MemoEntry, MemoResponse, NextStepSuggestion } from "../lib/types";
 
 function formatTimestamp(seconds: number) {
   const m = Math.floor(seconds / 60);
@@ -90,20 +90,91 @@ function EntryView({ entry, onChanged }: { entry: MemoEntry; onChanged: () => vo
   );
 }
 
+function NextStepView({ suggestion, onChanged }: { suggestion: NextStepSuggestion; onChanged: () => void }) {
+  async function accept() {
+    await api.acceptNextStep(suggestion.id);
+    onChanged();
+  }
+  async function dismiss() {
+    await api.dismissNextStep(suggestion.id);
+    onChanged();
+  }
+
+  return (
+    <div className="memo-entry">
+      {suggestion.suggested_direction && <p style={{ margin: 0 }}>{suggestion.suggested_direction}</p>}
+      {suggestion.recommended_conversation_id != null && (
+        <p style={{ margin: 0 }}>
+          Listen to:{" "}
+          <Link to={`/?conversation=${suggestion.recommended_conversation_id}`}>
+            <em>{suggestion.recommended_conversation_title}</em>
+          </Link>
+        </p>
+      )}
+      <div className="meta">{suggestion.rationale}</div>
+      {suggestion.status === "suggested" ? (
+        <div style={{ marginTop: "0.3rem" }}>
+          <button className="primary" onClick={accept}>
+            Accept
+          </button>
+          <button className="secondary" onClick={dismiss} style={{ marginLeft: "0.3rem" }}>
+            Dismiss
+          </button>
+        </div>
+      ) : (
+        <div className="meta" style={{ fontStyle: "italic" }}>
+          {suggestion.status}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MemoPage() {
   const [memo, setMemo] = useState<MemoResponse | null>(null);
+  const [nextSteps, setNextSteps] = useState<NextStepSuggestion[]>([]);
+  const [generatingNextSteps, setGeneratingNextSteps] = useState(false);
 
   function refresh() {
     api.getMemo().then(setMemo);
   }
 
-  useEffect(refresh, []);
+  function refreshNextSteps() {
+    api.listNextSteps().then(setNextSteps);
+  }
+
+  useEffect(() => {
+    refresh();
+    refreshNextSteps();
+  }, []);
+
+  async function suggestNextSteps() {
+    setGeneratingNextSteps(true);
+    try {
+      await api.generateNextSteps();
+      refreshNextSteps();
+    } finally {
+      setGeneratingNextSteps(false);
+    }
+  }
 
   if (!memo) return <p style={{ padding: "2rem" }}>Loading…</p>;
 
   return (
     <div style={{ maxWidth: 800, margin: "0 auto", padding: "2rem" }}>
       <h1>Running RQ memo</h1>
+
+      <div className="memo-section">
+        <h2>What to listen to next</h2>
+        <button className="primary" onClick={suggestNextSteps} disabled={generatingNextSteps}>
+          {generatingNextSteps ? "Thinking…" : "Suggest next steps"}
+        </button>
+        {nextSteps.length === 0 && <p style={{ color: "#999" }}>No suggestions yet.</p>}
+        {nextSteps.map((s) => (
+          <NextStepView key={s.id} suggestion={s} onChanged={refreshNextSteps} />
+        ))}
+      </div>
+
       {memo.sections.map((section) => (
         <div className="memo-section" key={section.research_question_id}>
           <h2>{section.name}</h2>

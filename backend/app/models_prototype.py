@@ -155,6 +155,34 @@ class SectionCheckpoint(PrototypeBase):
     )
 
 
+class ConversationGist(PrototypeBase):
+    """Cached AI summary of a Cortico conversation — a corpus-level fact (not per-user),
+    generated once by backend/scripts/backfill_gists.py and reused across users/RQs so
+    next-step suggestion generation never has to re-summarize the corpus."""
+
+    __tablename__ = "conversation_gist"
+    conversation_id = Column(Integer, primary_key=True)  # Cortico's int id, not a surrogate key
+    project_id = Column(Integer, nullable=False)
+    forum_id = Column(Integer)
+    summary_text = Column(Text, nullable=False)
+    keywords_json = Column(Text, nullable=False)  # JSON: list[str]
+    generated_at = Column(DateTime, nullable=False, default=_now)
+
+
+class NextStepSuggestion(PrototypeBase):
+    __tablename__ = "next_step_suggestion"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False)
+    research_question_id = Column(Integer, ForeignKey("research_question.id"), nullable=True)
+    suggested_direction = Column(Text)
+    recommended_conversation_id = Column(Integer)  # Cortico conversation.id, validated before persisting
+    rationale = Column(Text)
+    status = Column(String, nullable=False, default="suggested")  # suggested -> accepted | dismissed
+    ai_metadata = Column(Text)  # JSON: {model, reasoning_effort, prompt}
+    created_at = Column(DateTime, nullable=False, default=_now)
+    updated_at = Column(DateTime, nullable=False, default=_now, onupdate=_now)
+
+
 class AppSetting(PrototypeBase):
     """Not in the PRD's data model — added to persist the editable AI-review prompt
     (view/save/reset-to-default) across restarts. See docs/prototype-log.md."""

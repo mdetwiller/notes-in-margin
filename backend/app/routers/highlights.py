@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..config import get_config
-from ..db import get_prototype_db
+from ..db import get_cortico_db, get_prototype_db
+from ..models_cortico import Conversation
 from ..models_prototype import HighlightSnippet, RLHighlight
 from ..schemas import HighlightCreate, HighlightUpdate
 
@@ -43,12 +44,19 @@ def list_highlights(conversation_id: int, prototype_db: Session = Depends(get_pr
 
 @router.post("/conversations/{conversation_id}/highlights")
 def create_highlight(
-    conversation_id: int, body: HighlightCreate, prototype_db: Session = Depends(get_prototype_db)
+    conversation_id: int,
+    body: HighlightCreate,
+    cortico_db: Session = Depends(get_cortico_db),
+    prototype_db: Session = Depends(get_prototype_db),
 ):
+    conversation = cortico_db.get(Conversation, conversation_id)
+    if conversation is None:
+        raise HTTPException(404, "conversation not found")
+
     highlight = RLHighlight(
         user_id=config.default_user_id,
         conversation_id=conversation_id,
-        project_id=config.default_project_id,
+        project_id=conversation.project_id,
         title=body.title,
         notes=body.notes,
     )

@@ -96,3 +96,34 @@ note the difference. Entries are added as they're hit, not just up front.
   reflection with macOS `say`, uploaded it through `POST /conversations/9/voice_memos`, and
   confirmed `faster-whisper` returned an accurate, correctly word-timestamped transcription
   in the exact `{word,start,end,confidence}` shape Cortico uses.
+
+## Phase 2 (`docs/prd-phase-2.md`)
+
+- **`OPENAI_API_KEY` now available** (with a custom base URL) in `backend/.env`, unlike
+  Phase 1 — both `backfill_gists.py` and `generate_next_step_suggestions` were verified
+  against real `gpt-5.6-luna` round trips, not just structurally.
+- **Scope-widening done exactly as scoped:** `scoped_conversation_ids` removed from
+  `config.yaml`/`Config` entirely (not just unused in `list_conversations`) since nothing
+  else referenced it after the filter was dropped — leaving a dead config field around
+  would've been worse than deleting it. `create_highlight` now looks up the real
+  `project_id` from Cortico instead of hardcoding `config.default_project_id`.
+- **Gist backfill run (real snapshot, 2026-10-06):** 201/201 conversations now have a
+  `conversation_gist` row (3 from an initial smoke-test run + 198 from the full run).
+  198-conversation run: **720.7s wall time (~3.64s/call avg)**, **279,579 input + 29,813
+  output tokens**. No published per-token price for `gpt-5.6-luna` was available in this
+  environment to convert that into a dollar figure — flagging rather than guessing.
+- **Snippet sampling for gists:** "a handful of substantive snippets" (PRD wording) is
+  implemented as up to 20 snippets, evenly spread across the whole conversation (not just
+  its opening) after filtering out `is_mechanical`/`is_facilitator_prompt` lines, falling
+  back to the full (unfiltered) snippet list for a conversation with no substantive ones.
+- **3 of the 201 conversations (ids 160, 162, 201) have zero snippets at all** in the
+  snapshot, not just zero substantive ones. The gist backfill's fallback path still runs,
+  the model is given an empty snippet list for each, and all three correctly came back
+  with some form of "no substantive conversation content was provided" rather than an
+  invented summary — the guardrail doing its job on a genuine edge case, not a bug.
+- **Next-step suggestions reuse `config.ai_review`'s model/effort** (not pinned to `low`
+  the way the backfill is) per the PRD; manually verified end-to-end in the browser against
+  the one real filed voice memo in the dev db (conversation 10, an extracted interest about
+  "what kids internalize from leaders' behavior") — produced suggestions correctly grounded
+  in that interest, each citing a real, valid, previously-unvisited conversation id with a
+  rationale traceable to that conversation's actual gist content.

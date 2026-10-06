@@ -3,7 +3,6 @@
 
 default_user_id: 101
 default_project_id: 5
-scoped_conversation_ids: [9, 10]
 
 cortico_db_path: "../acp_pipeline_snapshot.db"
 prototype_db_path: "db/prototype.db"
