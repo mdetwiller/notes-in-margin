@@ -1,0 +1,33 @@
+# Data snapshots and derived databases — never committed
+acp_pipeline_snapshot.db
+db/prototype.db
+db/local/
+
+# Audio recordings
+*.webm
+*.wav
+
+# Python
+backend/.venv/
+backend/__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+
+# Whisper model cache (downloaded locally, not committed)
+backend/.cache/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+npm-debug.log*
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+Backend/.env/
+
+# OS / editor
+.DS_Store
+.vscode/

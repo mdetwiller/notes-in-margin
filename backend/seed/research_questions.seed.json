@@ -1,0 +1,17 @@
+[
+  {
+    "name": "How do people describe trust in local institutions?",
+    "description": "Look for stories where trust is built or broken.",
+    "display_order": 0
+  },
+  {
+    "name": "What does belonging to this community feel like?",
+    "description": "Moments of pride, connection, or being known by name.",
+    "display_order": 1
+  },
+  {
+    "name": "Where do people experience friction or disconnection?",
+    "description": "Stories of struggle, drifting apart, or unmet needs.",
+    "display_order": 2
+  }
+]

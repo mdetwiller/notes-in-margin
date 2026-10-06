@@ -1,0 +1,22 @@
+# Prototype config — model id/effort and other tunables live here, not in code,
+# so they can change without a rebuild (PRD: "AI behavior" / "Model and editable prompt").
+
+default_user_id: 101
+default_project_id: 5
+scoped_conversation_ids: [9, 10]
+
+cortico_db_path: "../acp_pipeline_snapshot.db"
+prototype_db_path: "db/prototype.db"
+audio_dir: "db/local/audio"
+
+ai_review:
+  model: "gpt-5.6-luna"
+  reasoning_effort: "low"
+
+transcription:
+  engine: "faster-whisper (local)"
+  model_size: "small.en"
+  compute_type: "int8"
+
+voice_memo:
+  max_duration_seconds: 1200
