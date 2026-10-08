@@ -127,3 +127,11 @@ note the difference. Entries are added as they're hit, not just up front.
   "what kids internalize from leaders' behavior") — produced suggestions correctly grounded
   in that interest, each citing a real, valid, previously-unvisited conversation id with a
   rationale traceable to that conversation's actual gist content.
+- **Code-family synthesis manually verified live** against RQ 1's one real filed entry in
+  the dev db ("How do people describe trust in local institutions?") — produced a family
+  grounded in that entry's actual text, correctly member-linked to the real connection id.
+  Re-ran synthesis a second time: no duplicate family was created (confirms the
+  attach-to-existing-family path, not just the create-new path). Thin test data (1 entry)
+  means clustering-across-multiple-entries behavior is implemented per the PRD but not yet
+  exercised against a real multi-entry RQ — flagging rather than claiming more than was
+  actually observed.

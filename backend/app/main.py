@@ -11,6 +11,7 @@ from .config import get_config
 from .db import PrototypeBase, PrototypeSession, prototype_engine
 from .routers import (
     checkpoints,
+    code_families,
     conversations,
     highlights,
     memo,
@@ -52,6 +53,7 @@ app.include_router(voice_memos.router)
 app.include_router(review.router)
 app.include_router(memo.router)
 app.include_router(next_steps.router)
+app.include_router(code_families.router)
 app.include_router(settings.router)
 
 

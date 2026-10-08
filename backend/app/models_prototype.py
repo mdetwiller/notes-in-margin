@@ -183,6 +183,34 @@ class NextStepSuggestion(PrototypeBase):
     updated_at = Column(DateTime, nullable=False, default=_now, onupdate=_now)
 
 
+class CodeFamily(PrototypeBase):
+    """A proposed thematic cluster of a research question's filed memo entries — a
+    precursor to a future codebook/tagging system, not a replacement for one (see
+    docs/prd-phase-2.md)."""
+
+    __tablename__ = "code_family"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False)
+    research_question_id = Column(Integer, ForeignKey("research_question.id"), nullable=False)
+    name = Column(String, nullable=False)
+    definition = Column(Text, nullable=False)
+    status = Column(String, nullable=False, default="suggested")  # suggested -> accepted | dismissed
+    ai_metadata = Column(Text)  # JSON: {model, reasoning_effort, prompt}
+    created_at = Column(DateTime, nullable=False, default=_now)
+    updated_at = Column(DateTime, nullable=False, default=_now, onupdate=_now)
+
+    members = relationship("CodeFamilyMember", backref="family", cascade="all, delete-orphan")
+
+
+class CodeFamilyMember(PrototypeBase):
+    """Join: which filed memo entries (reflection_connection rows) exemplify a family."""
+
+    __tablename__ = "code_family_member"
+    id = Column(Integer, primary_key=True)
+    code_family_id = Column(Integer, ForeignKey("code_family.id"), nullable=False)
+    connection_id = Column(Integer, ForeignKey("reflection_connection.id"), nullable=False)
+
+
 class AppSetting(PrototypeBase):
     """Not in the PRD's data model — added to persist the editable AI-review prompt
     (view/save/reset-to-default) across restarts. See docs/prototype-log.md."""

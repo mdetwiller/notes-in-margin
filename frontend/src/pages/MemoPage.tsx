@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, audioUrlFor } from "../lib/api";
-import type { MemoEntry, MemoResponse, NextStepSuggestion } from "../lib/types";
+import type { CodeFamily, MemoEntry, MemoResponse, NextStepSuggestion } from "../lib/types";
 
 function formatTimestamp(seconds: number) {
   const m = Math.floor(seconds / 60);
@@ -130,6 +130,124 @@ function NextStepView({ suggestion, onChanged }: { suggestion: NextStepSuggestio
   );
 }
 
+function CodeFamilyCard({ family, onChanged }: { family: CodeFamily; onChanged: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(family.name);
+  const [definition, setDefinition] = useState(family.definition);
+
+  async function save() {
+    await api.updateCodeFamily(family.id, { name, definition });
+    setEditing(false);
+    onChanged();
+  }
+
+  async function accept() {
+    await api.acceptCodeFamily(family.id);
+    onChanged();
+  }
+
+  async function dismiss() {
+    await api.dismissCodeFamily(family.id);
+    onChanged();
+  }
+
+  return (
+    <div className="memo-entry">
+      {editing ? (
+        <>
+          <input style={{ width: "100%" }} value={name} onChange={(e) => setName(e.target.value)} />
+          <textarea
+            rows={2}
+            style={{ width: "100%", marginTop: "0.3rem" }}
+            value={definition}
+            onChange={(e) => setDefinition(e.target.value)}
+          />
+          <button className="primary" onClick={save}>
+            Save
+          </button>
+          <button className="secondary" onClick={() => setEditing(false)} style={{ marginLeft: "0.3rem" }}>
+            Cancel
+          </button>
+        </>
+      ) : (
+        <>
+          <strong>{family.name}</strong>
+          <p style={{ margin: 0 }}>{family.definition}</p>
+        </>
+      )}
+      <div className="meta">
+        <button style={{ fontSize: "0.8rem" }} onClick={() => setExpanded(!expanded)}>
+          {family.members.length} member{family.members.length === 1 ? "" : "s"} {expanded ? "▲" : "▼"}
+        </button>
+      </div>
+      {expanded && (
+        <ul style={{ margin: "0.3rem 0" }}>
+          {family.members.map((m) => (
+            <li key={m.connection_id} style={{ fontSize: "0.85rem" }}>
+              {m.insight_text}
+            </li>
+          ))}
+        </ul>
+      )}
+      {!editing && (
+        <div style={{ marginTop: "0.3rem" }}>
+          <button className="secondary" onClick={() => setEditing(true)}>
+            Rename/redefine
+          </button>
+          {family.status === "suggested" && (
+            <button className="primary" onClick={accept} style={{ marginLeft: "0.3rem" }}>
+              Accept
+            </button>
+          )}
+          {family.status !== "dismissed" && (
+            <button className="secondary" onClick={dismiss} style={{ marginLeft: "0.3rem" }}>
+              Dismiss
+            </button>
+          )}
+          {family.status !== "suggested" && (
+            <span className="meta" style={{ fontStyle: "italic", marginLeft: "0.5rem" }}>
+              {family.status}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CodeFamiliesSection({ researchQuestionId }: { researchQuestionId: number }) {
+  const [families, setFamilies] = useState<CodeFamily[]>([]);
+  const [synthesizing, setSynthesizing] = useState(false);
+
+  function refresh() {
+    api.listCodeFamilies(researchQuestionId).then(setFamilies);
+  }
+
+  useEffect(refresh, [researchQuestionId]);
+
+  async function synthesize() {
+    setSynthesizing(true);
+    try {
+      const result = await api.synthesizeCodeFamilies(researchQuestionId);
+      setFamilies(result);
+    } finally {
+      setSynthesizing(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: "0.75rem" }}>
+      <button className="secondary" onClick={synthesize} disabled={synthesizing}>
+        {synthesizing ? "Synthesizing…" : "Synthesize code families"}
+      </button>
+      {families.map((f) => (
+        <CodeFamilyCard key={f.id} family={f} onChanged={refresh} />
+      ))}
+    </div>
+  );
+}
+
 export default function MemoPage() {
   const [memo, setMemo] = useState<MemoResponse | null>(null);
   const [nextSteps, setNextSteps] = useState<NextStepSuggestion[]>([]);
@@ -182,6 +300,7 @@ export default function MemoPage() {
           {section.entries.map((e) => (
             <EntryView key={e.connection_id} entry={e} onChanged={refresh} />
           ))}
+          <CodeFamiliesSection researchQuestionId={section.research_question_id} />
         </div>
       ))}
 

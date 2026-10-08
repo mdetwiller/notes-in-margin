@@ -1,4 +1,5 @@
 import type {
+  CodeFamily,
   ConnectionEvidence,
   ConversationDetail,
   ConversationSummary,
@@ -92,6 +93,15 @@ export const api = {
     request<NextStepSuggestion[]>(`/next_steps?include_dismissed=${includeDismissed}`),
   acceptNextStep: (id: number) => request(`/next_steps/${id}/accept`, { method: "POST" }),
   dismissNextStep: (id: number) => request(`/next_steps/${id}/dismiss`, { method: "POST" }),
+
+  listCodeFamilies: (rqId: number, includeDismissed = false) =>
+    request<CodeFamily[]>(`/research_questions/${rqId}/code_families?include_dismissed=${includeDismissed}`),
+  synthesizeCodeFamilies: (rqId: number) =>
+    request<CodeFamily[]>(`/research_questions/${rqId}/code_families/synthesize`, { method: "POST" }),
+  updateCodeFamily: (id: number, body: { name?: string; definition?: string }) =>
+    request<CodeFamily>(`/code_families/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  acceptCodeFamily: (id: number) => request(`/code_families/${id}/accept`, { method: "POST" }),
+  dismissCodeFamily: (id: number) => request(`/code_families/${id}/dismiss`, { method: "POST" }),
 
   getReviewPrompt: () => request<{ text: string; default_text: string }>("/settings/review-prompt"),
   saveReviewPrompt: (text: string) =>

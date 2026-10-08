@@ -87,3 +87,8 @@ class MemoEntryUpdate(BaseModel):
 class MemoReorderRequest(BaseModel):
     research_question_id: int
     ordered_connection_ids: list[int]
+
+
+class CodeFamilyUpdate(BaseModel):
+    name: str | None = None
+    definition: str | None = None

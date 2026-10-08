@@ -171,3 +171,19 @@ export interface NextStepSuggestion {
   ai_metadata: { model: string; reasoning_effort: string; prompt: string } | null;
   created_at: string;
 }
+
+export interface CodeFamilyMember {
+  connection_id: number;
+  insight_text: string;
+}
+
+export interface CodeFamily {
+  id: number;
+  research_question_id: number;
+  name: string;
+  definition: string;
+  status: "suggested" | "accepted" | "dismissed";
+  members: CodeFamilyMember[];
+  ai_metadata: { model: string; reasoning_effort: string; prompt: string } | null;
+  created_at: string;
+}
