@@ -298,6 +298,13 @@ export default function ReaderPage() {
         />
       )}
 
+      {activeVoiceMemo && !reviewResult && !reviewError && (
+        <div className="reflection-panel" style={{ padding: "1.5rem", fontFamily: "sans-serif" }}>
+          Reviewing your reflection against your research questions… this calls out to the AI
+          and can take a few seconds.
+        </div>
+      )}
+
       {activeVoiceMemo && reviewResult && (
         <ReviewStep
           voiceMemo={activeVoiceMemo}

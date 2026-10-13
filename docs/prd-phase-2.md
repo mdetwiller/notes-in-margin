@@ -197,29 +197,47 @@ never changes anything the user sees as "decided."
 
 ## Acceptance criteria
 
-- [ ] `backfill_gists.py` has actually been run against the real snapshot; spot-checking
+- [x] `backfill_gists.py` has actually been run against the real snapshot; spot-checking
       a handful of `conversation_gist` rows shows sane, real summaries (not hallucinated
-      or empty).
-- [ ] The reader's conversation switcher lists all 201 conversations, not just project 5's
+      or empty). *Verified 2026-10-06: all 201/201 conversations backfilled (720.7s,
+      279,579 input + 29,813 output tokens for the 198-conversation full run); spot-checked
+      rows are grounded, and the 3 conversations with zero real snippets correctly came
+      back with an honest "no substantive content" summary instead of a hallucinated one.
+      See docs/prototype-log.md.*
+- [x] The reader's conversation switcher lists all 201 conversations, not just project 5's
       two; opening any of them renders correctly, with or without a conversation guide.
-- [ ] A highlight created on a conversation outside project 5 is labeled with that
-      conversation's real `project_id`, not a hardcoded 5.
-- [ ] "Suggest next steps" on the memo page produces at least one suggestion referencing
+      *Verified live: `GET /conversations` returns all 201; conversation #1 (project 1, no
+      guide) renders correctly with an empty `guide_questions` list.*
+- [x] A highlight created on a conversation outside project 5 is labeled with that
+      conversation's real `project_id`, not a hardcoded 5. *Verified live and by
+      `tests/test_highlights.py`: a highlight on conversation 1 gets `project_id=1`.*
+- [x] "Suggest next steps" on the memo page produces at least one suggestion referencing
       real `extracted_interests` content and, where a conversation is recommended, that
       conversation is a real, valid id and (when possible) one the user hasn't already
-      engaged with.
-- [ ] Accepting or dismissing a next-step suggestion persists and is reflected on reload;
-      dismissed ones are hidden by default but not deleted.
-- [ ] "Synthesize code families" on an RQ with accepted/edited memo entries produces
+      engaged with. *Verified live against the one real filed voice memo in the dev db
+      (conversation 10's extracted interest about "what kids internalize from leaders'
+      behavior") — produced suggestions grounded in that interest, each citing a real,
+      valid, previously-unvisited conversation id.*
+- [x] Accepting or dismissing a next-step suggestion persists and is reflected on reload;
+      dismissed ones are hidden by default but not deleted. *Verified live in the browser
+      and by `tests/test_next_steps.py`.*
+- [x] "Synthesize code families" on an RQ with accepted/edited memo entries produces
       family suggestions whose member entries are verifiably real, accepted/edited
-      connections under that RQ.
-- [ ] Re-running synthesis on an RQ that already has accepted families doesn't propose
+      connections under that RQ. *Verified live against RQ 1's one real filed entry, and
+      by `tests/test_code_families.py`.*
+- [x] Re-running synthesis on an RQ that already has accepted families doesn't propose
       obvious duplicates — it either leaves them alone or attaches new members to them.
-- [ ] Renaming, accepting, or dismissing a code family persists and is reflected on
-      reload; dismissed ones stay logged, not deleted.
-- [ ] No existing Phase 1 data (highlights, connections, memo entries) is altered or lost
+      *Verified live: re-running synthesis on RQ 1 attached to the existing family rather
+      than creating a duplicate; also covered by
+      `test_apply_family_results_attaches_to_existing_family_instead_of_duplicating`.*
+- [x] Renaming, accepting, or dismissing a code family persists and is reflected on
+      reload; dismissed ones stay logged, not deleted. *Verified live (rename + accept) and
+      by `tests/test_code_families.py` (rename, accept, dismiss-not-deleted).*
+- [x] No existing Phase 1 data (highlights, connections, memo entries) is altered or lost
       by anything in this phase — verified against the real `db/prototype.db`, not just an
-      isolated test database.
+      isolated test database. *All four new tables are additive-only; real dev-db data
+      (RQs, highlights, filed connections) was spot-checked before and after each change
+      and is untouched.*
 
 ## Open questions
 
