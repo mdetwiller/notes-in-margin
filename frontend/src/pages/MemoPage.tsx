@@ -69,7 +69,7 @@ function EntryView({ entry, onChanged }: { entry: MemoEntry; onChanged: () => vo
         Evidence:
         {entry.evidence.map((e, i) => (
           <div key={i} style={{ marginLeft: "0.5rem" }}>
-            <Link to={`/?conversation=${entry.conversation_id}`}>"{e.text || `snippet ${e.snippet_id}`}"</Link>{" "}
+            <Link to={`/?conversation=${entry.conversation_id}&snippet=${e.snippet_id}`}>"{e.text || `snippet ${e.snippet_id}`}"</Link>{" "}
             ({e.source === "user" ? "yours" : "AI-suggested"}
             {e.starred ? ", starred" : ""})
             <button style={{ fontSize: "0.7rem" }} onClick={() => removeEvidence(i)}>

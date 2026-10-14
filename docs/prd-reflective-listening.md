@@ -341,20 +341,20 @@ The prototype is ready for a test round when all of these hold.
 
 **Review and filing**
 
-- [ ] The review step shows the transcription next to proposed RQ connections, each with evidence passages badged `yours` or `AI-suggested`.
-- [ ] Starred highlights always appear among candidate evidence; the user's other highlights are preferred over unhighlighted text.
+- [x] The review step shows the transcription next to proposed RQ connections, each with evidence passages badged `yours` or `AI-suggested`. *Verified 2026-10-14: AI evidence that overlaps any of the user's highlights (starred or not) is linked via `highlight_id` and badged `yours`; review adds/edits and memo edits link the same way (`tests/test_evidence_provenance.py`). Existing dev-db rows need the additive backfill script (prototype log).*
+- [x] Starred highlights always appear among candidate evidence; the user's other highlights are preferred over unhighlighted text. *Verified 2026-10-14: after the model returns, every starred highlight is either cited by an RQ connection or returned as starred-unassigned, whatever the model did. Evidence is ordered starred → other highlights → AI-only text (`tests/test_evidence_provenance.py`).*
 - [ ] Each connection can be accepted, edited, or rejected, and the user can add one the AI missed.
 - [ ] Nothing reaches the memo before "File to memo"; rejected proposals stay in the log with status `rejected`.
 - [ ] A reflection that fits no RQ is shown as unmapped, not forced into one.
 
-* [ ] A starred highlight the voice memo never mentions is offered in review for RQ assignment; if left unassigned, it appears under "Starred, unassigned" on the memo page.
+* [x] A starred highlight the voice memo never mentions is offered in review for RQ assignment; if left unassigned, it appears under "Starred, unassigned" on the memo page. *Verified 2026-10-14: review has an "Assign to: RQ" control per highlight, filed as a connection with that highlight as evidence. Highlights the AI cited no longer show as unassigned (`tests/test_evidence_provenance.py`). UI type-checked, not yet clicked through in a browser.*
 
 - [ ] AI review calls use `gpt-5.6-luna` at `low` reasoning effort, set in config.
 - [ ] The review prompt can be viewed, edited, saved, and reset to default from the UI, and the next review uses the saved version.
 
 **Memo**
 
-- [ ] The full memo page shows one section per RQ with entries that link back to transcript passages and to the voice recording.
+- [x] The full memo page shows one section per RQ with entries that link back to transcript passages and to the voice recording. *Verified 2026-10-14: evidence links go to `/?conversation=N&snippet=ID`, and the reader scrolls to and outlines that snippet. Type-checked, not yet clicked through in a browser.*
 - [ ] The side-panel memo shows the same entries, compactly, while reading another transcript.
 
 * [ ] A filed entry can be edited (insight text and evidence) and retracted from the memo page, and prior versions are kept.

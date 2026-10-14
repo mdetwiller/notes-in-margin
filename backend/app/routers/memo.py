@@ -7,10 +7,10 @@ from sqlalchemy.orm import Session
 
 from ..config import get_config
 from ..db import get_cortico_db, get_prototype_db
+from ..evidence_provenance import assigned_highlight_ids, evidence_row, highlight_spans
 from ..evidence_text import quoted_texts
 from ..models_cortico import Conversation
 from ..models_prototype import (
-    ConnectionEvidence,
     ReflectionConnection,
     ReflectionConnectionRevision,
     ResearchQuestion,
@@ -104,6 +104,7 @@ def get_memo(
             "filed_at": c.updated_at.isoformat(),
             "evidence": [
                 {
+                    "highlight_id": e.highlight_id,
                     "snippet_id": e.snippet_id,
                     "start_index": e.start_index,
                     "end_index": e.end_index,
@@ -128,8 +129,8 @@ def get_memo(
         for rq in research_questions
     ]
 
-    # Starred highlights never cited by any filed connection, grouped by conversation.
-    all_cited_highlight_ids = {e.highlight_id for c in connections for e in c.evidence if e.highlight_id}
+    # Starred highlights not cited by any filed connection on an RQ, grouped by conversation.
+    all_cited_highlight_ids = assigned_highlight_ids(connections)
     starred_unassigned: dict[int, dict] = {}
     for h in all_starred_highlights:
         if h.id in all_cited_highlight_ids:
@@ -177,6 +178,7 @@ def edit_memo_entry(
             evidence_snapshot=json.dumps(
                 [
                     {
+                        "highlight_id": e.highlight_id,
                         "snippet_id": e.snippet_id,
                         "start_index": e.start_index,
                         "end_index": e.end_index,
@@ -196,17 +198,10 @@ def edit_memo_entry(
     if body.evidence is not None:
         for e in list(connection.evidence):
             prototype_db.delete(e)
+        vm = prototype_db.get(VoiceMemo, connection.voice_memo_id)
+        spans = highlight_spans(prototype_db, vm.user_id, vm.conversation_id)
         for ev in body.evidence:
-            prototype_db.add(
-                ConnectionEvidence(
-                    connection_id=connection.id,
-                    highlight_id=ev.highlight_id,
-                    snippet_id=ev.snippet_id,
-                    start_index=ev.start_index,
-                    end_index=ev.end_index,
-                    source=ev.source,
-                )
-            )
+            prototype_db.add(evidence_row(connection.id, ev, spans, vm, prototype_db))
     connection.status = "edited"
     prototype_db.commit()
     return {"id": connection.id, "status": connection.status}
