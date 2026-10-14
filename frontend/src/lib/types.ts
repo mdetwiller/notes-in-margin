@@ -182,8 +182,27 @@ export interface CodeFamily {
   research_question_id: number;
   name: string;
   definition: string;
-  status: "suggested" | "accepted" | "dismissed";
+  status: "suggested" | "accepted" | "dismissed" | "merged";
   members: CodeFamilyMember[];
   ai_metadata: { model: string; reasoning_effort: string; prompt: string } | null;
   created_at: string;
+}
+
+export interface CodeFamilyMergeSuggestion {
+  id: number;
+  research_question_id: number;
+  family_ids: number[];
+  target_family_id: number;
+  proposed_name: string;
+  proposed_definition: string;
+  rationale: string | null;
+  status: "suggested" | "accepted" | "dismissed";
+  created_at: string;
+}
+
+export interface CodeFamilyState {
+  families: CodeFamily[];
+  merge_suggestions: CodeFamilyMergeSuggestion[];
+  cap: { live_count: number; max_per_rq: number; near_cap: boolean; at_cap: boolean };
+  withheld_new_families: number;
 }

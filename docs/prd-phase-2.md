@@ -241,15 +241,29 @@ never changes anything the user sees as "decided."
 
 ## Open questions
 
-- [ ] **Gist staleness:** if new conversations are added to the snapshot later, or a
-      conversation's content changes, `conversation_gist` rows won't auto-refresh. Is a
-      staleness check needed this round, or is "run the backfill script again, it skips
-      existing rows" an acceptable manual process for now? *Leaning: acceptable for now —
-      flag it, don't build invalidation logic yet.*
+- [x] **Gist staleness:** if new conversations are added to the snapshot later, or a
+      conversation's content changes, `conversation_gist` rows won't auto-refresh.
+      *Decided 2026-10-14: no refresh logic. Conversation data doesn't change, and re-running
+      the backfill (which skips existing rows) covers newly added conversations.*
 - [ ] **Suggestion fatigue:** if "Suggest next steps" is clicked repeatedly without
-      dismissing old suggestions, should older undismissed ones be superseded/merged, or
-      is an accumulating list acceptable for this round? *Leaning: accumulating list is
-      fine for a single-user prototype; revisit if it gets noisy in practice.*
-- [ ] **Code family granularity:** no guidance yet on how many families is "right" for a
-      given RQ's entry count — left to the model's judgment and the user's own
-      accept/dismiss curation, not a fixed target.
+      dismissing old suggestions, they accumulate. *Under discussion 2026-10-14: let the user
+      drag suggestions into priority order, and possibly move next steps off the memo page
+      (own page or side panel).*
+- [x] **Code family granularity.** *Decided 2026-10-14 and implemented:*
+      - *Code families are broad parent themes (the future parents of child codes), not
+        nuances within a topic.*
+      - *Each RQ is capped at 5 live (suggested + accepted) families, with at most 2 new
+        families per synthesis run. The prompt asks the model to prefer attaching entries
+        to existing families, and the server enforces both limits.*
+      - *From 4 families on, synthesis also proposes merges of overlapping families. Accepting
+        a merge folds the members into one family and marks the others `merged` (logged,
+        not deleted).*
+      - *At the cap, the user can choose "synthesize past the cap", still limited to 2 new
+        families per run.*
+      - *The limits live in `config.yaml` under `code_families`.*
+
+## Follow-up work
+
+- **Codebook generation and tagging**, the next phase once the open questions above are
+  settled. Code families become parent codes with child codes under them, and codes get
+  assigned to highlights/snippets.

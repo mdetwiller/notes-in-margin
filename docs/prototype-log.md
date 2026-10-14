@@ -131,7 +131,40 @@ note the difference. Entries are added as they're hit, not just up front.
   the dev db ("How do people describe trust in local institutions?") — produced a family
   grounded in that entry's actual text, correctly member-linked to the real connection id.
   Re-ran synthesis a second time: no duplicate family was created (confirms the
-  attach-to-existing-family path, not just the create-new path). Thin test data (1 entry)
-  means clustering-across-multiple-entries behavior is implemented per the PRD but not yet
-  exercised against a real multi-entry RQ — flagging rather than claiming more than was
-  actually observed.
+  attach-to-existing-family path, not just the create-new path).
+- **Clustering across multiple entries is now exercised (updated 2026-10-14).** The dev db
+  has 3 filed reflections (conversations 10, 44, 91) and 7 code families across RQs 1, 3, 4
+  and 5. Two of those families (ids 4 and 7) each cluster 2 entries. The note above,
+  written with one filed entry, was out of date.
+
+## Phase 2 follow-ups (2026-10-14)
+
+- **Previously unlogged Phase 1 data-model deviations**, found in the 2026-10-14
+  acceptance-criteria audit:
+  - `section_checkpoint.guide_question_id` (the PRD says `guide_prompt_id`). It follows the
+    snapshot's `guidequestion` table.
+  - `voice_memo` has two extra columns, `transcription_progress` and
+    `transcription_error`, plus `transcribing`/`failed`/`filed` status values for the
+    background transcription job.
+  - `reflection_connection.memo_order` (memo ordering).
+  - `edited_from_ai` is a boolean column rather than a source value.
+- **`connection_evidence.highlight_id` is never populated** by AI review, manual adds, or
+  memo-page evidence edits. As a result, review badges only say `yours` for exact matches
+  with a *starred* span, and "Starred, unassigned" lists starred highlights the AI did cite.
+  All 85 evidence rows in the dev db are `source=ai`. Tracked as unmet in the Phase 1
+  acceptance criteria.
+- **Code-family cap and merges.** These aren't in `docs/prd-phase-2.md`; they come from
+  resolving its granularity open question.
+  - New config block `code_families` (`max_per_rq: 5`, `near_cap_at: 4`,
+    `max_new_per_run: 2`).
+  - New additive table `code_family_merge_suggestion`. Its name was checked against
+    `db/schema.sql`, which has no `merge` tables.
+  - New `merged` status on `code_family`.
+  - New endpoints: `GET /research_questions/{id}/code_families/state`,
+    `POST .../synthesize?override_cap=true`, and `POST /code_family_merges/{id}/accept|dismiss`.
+  - The synthesize response changed from a bare list to the state object.
+- **Live run against a copy of the dev db.** Synthesis on RQ 3 (3 families, 4 filed
+  entries) attached every entry to an existing family and proposed no new ones. With
+  `near_cap_at` lowered to 3 for one run, the model proposed no merges, judging RQ 3's
+  three families distinct. The merge-accept path is covered only by unit tests so far, not
+  a live merge.

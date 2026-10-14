@@ -1,5 +1,6 @@
 import type {
   CodeFamily,
+  CodeFamilyState,
   ConnectionEvidence,
   ConversationDetail,
   ConversationSummary,
@@ -96,8 +97,13 @@ export const api = {
 
   listCodeFamilies: (rqId: number, includeDismissed = false) =>
     request<CodeFamily[]>(`/research_questions/${rqId}/code_families?include_dismissed=${includeDismissed}`),
-  synthesizeCodeFamilies: (rqId: number) =>
-    request<CodeFamily[]>(`/research_questions/${rqId}/code_families/synthesize`, { method: "POST" }),
+  getCodeFamilyState: (rqId: number) => request<CodeFamilyState>(`/research_questions/${rqId}/code_families/state`),
+  synthesizeCodeFamilies: (rqId: number, overrideCap = false) =>
+    request<CodeFamilyState>(`/research_questions/${rqId}/code_families/synthesize?override_cap=${overrideCap}`, {
+      method: "POST",
+    }),
+  acceptCodeFamilyMerge: (id: number) => request<CodeFamilyState>(`/code_family_merges/${id}/accept`, { method: "POST" }),
+  dismissCodeFamilyMerge: (id: number) => request(`/code_family_merges/${id}/dismiss`, { method: "POST" }),
   updateCodeFamily: (id: number, body: { name?: string; definition?: string }) =>
     request<CodeFamily>(`/code_families/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   acceptCodeFamily: (id: number) => request(`/code_families/${id}/accept`, { method: "POST" }),

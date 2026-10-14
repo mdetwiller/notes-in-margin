@@ -27,7 +27,7 @@ export default function ReaderPage() {
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [researchQuestions, setResearchQuestions] = useState<ResearchQuestion[]>([]);
   const [memo, setMemo] = useState<MemoResponse | null>(null);
-  const [filedVoiceMemoExists, setFiledVoiceMemoExists] = useState(false);
+  const [recordedVoiceMemoExists, setRecordedVoiceMemoExists] = useState(false);
   const [attentionVoiceMemos, setAttentionVoiceMemos] = useState<
     { vm: VoiceMemo; pendingCount: number }[]
   >([]);
@@ -72,7 +72,9 @@ export default function ReaderPage() {
 
   async function refreshVoiceMemoStatus(id: number) {
     const vms = await api.listVoiceMemosForConversation(id);
-    setFiledVoiceMemoExists(vms.some((vm) => vm.status === "filed"));
+    // Any recording counts as "reflected" for the leave dialog, even one not yet reviewed
+    // or filed — the attention banner already covers finishing those.
+    setRecordedVoiceMemoExists(vms.some((vm) => vm.status !== "failed"));
 
     // A reflection needs attention if it was never reviewed at all, or if it has any
     // connection still sitting as "suggested" — e.g. one the user never got to decide on
@@ -101,8 +103,15 @@ export default function ReaderPage() {
   }
 
   function hasUnsavedReflectionRisk() {
-    const hasAnnotations = highlights.length > 0;
-    return hasAnnotations && !filedVoiceMemoExists;
+    // Confirm leaving whenever the user has engaged with this transcript at all — reached
+    // the end, highlighted, or dropped a checkpoint — not only once they've reached the
+    // end. Merely opening a transcript and leaving doesn't count, so browsing the
+    // conversation list doesn't nag.
+    const engaged =
+      reachedEndRef.current ||
+      highlights.length > 0 ||
+      !!conversation?.guide_questions.some((q) => q.checkpoint_snippet_id !== null);
+    return engaged && !recordedVoiceMemoExists;
   }
 
   function requestSwitch(nextId: number) {
@@ -180,6 +189,7 @@ export default function ReaderPage() {
   }
 
   async function handleRecorded(vm: VoiceMemo) {
+    setRecordedVoiceMemoExists(true);
     await openReview(vm);
   }
 
@@ -207,7 +217,7 @@ export default function ReaderPage() {
     setReviewResult(null);
     setActiveVoiceMemo(null);
     setReviewError(null);
-    setFiledVoiceMemoExists(true);
+    setRecordedVoiceMemoExists(true);
     refreshMemo();
     if (conversationId !== null) refreshVoiceMemoStatus(conversationId);
   }

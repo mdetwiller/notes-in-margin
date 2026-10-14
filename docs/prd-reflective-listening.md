@@ -319,62 +319,64 @@ Illustrative shapes for the main prototype-owned objects. Field names follow the
 
 The prototype is ready for a test round when all of these hold.
 
+*Audit 2026-10-14: 21 of 25 met. The 4 open items are all review/memo evidence-provenance gaps, most traced to `connection_evidence.highlight_id` never being populated.*
+
 **Reader and RQs**
 
-- [ ] The recreated reader supports highlighting, margin memos, hover section navigation, and transcript switching.
-- [ ] A highlight can be starred and unstarred, and the state persists after reload.
-- [ ] RQs load from the config file on first run and can be edited, added, reordered, and archived from the side panel while reading.
+- [x] The recreated reader supports highlighting, margin memos, hover section navigation, and transcript switching. *Audited 2026-10-14. Audio playback/karaoke degrade to plain text since every `audio_url` is empty (prototype log).*
+- [x] A highlight can be starred and unstarred, and the state persists after reload. *Audited 2026-10-14 (code path); no starred highlights exist in the dev db yet, so not exercised with real use.*
+- [x] RQs load from the config file on first run and can be edited, added, reordered, and archived from the side panel while reading. *Audited 2026-10-14. Known bug: archived RQs aren't fetched after a reload (`listResearchQuestions` defaults to `include_archived=false`), so they can't be un-archived from the UI.*
 
-* [ ] The user can drop a checkpoint on any speaker turn, assign it one of the guide's questions, and the hover menu updates to match.
-* [ ] Checkpoints can be moved or deleted, persist after reload, and unmarked questions still show in the menu.
+* [x] The user can drop a checkpoint on any speaker turn, assign it one of the guide's questions, and the hover menu updates to match. *Audited 2026-10-14; menu lists questions in guide order.*
+* [x] Checkpoints can be moved or deleted, persist after reload, and unmarked questions still show in the menu. *Audited 2026-10-14. "Move" in the UI is remove + re-mark; the backend upsert supports a direct move (`tests/test_review_filing.py`).*
 
 **Reflection**
 
-- [ ] Reaching the end of a transcript shows the reflection prompt once; dismissing it loses no data. Trying to open another transcript without a recorded reflection shows a confirmation dialog with "Reflect now" and "Leave anyway" actions.
-- [ ] The docked reflection panel shows the RQs, the four AI reflection questions, this transcript's highlights and memos (starred first), and a scrollable transcript at the same time.
-- [ ] Recording can be started, paused, stopped, and redone; the audio file is saved and linked to the voice memo.
-- [ ] Whisper returns a timestamped transcription in the `[word, start, end, confidence]` shape, stored alongside the user's edited text.
+- [x] Reaching the end of a transcript shows the reflection prompt once; dismissing it loses no data. Trying to open another transcript without a recorded reflection shows a confirmation dialog with "Reflect now" and "Leave anyway" actions. *Updated 2026-10-14: the dialog now fires on any engagement (reached the end, highlighted, or dropped a checkpoint), before or after the end, and any recording counts as reflected, not only a filed one. It guards the transcript switcher only; the top-nav Memo/Settings links aren't guarded.*
+- [x] The docked reflection panel shows the RQs, the four AI reflection questions, this transcript's highlights and memos (starred first), and a scrollable transcript at the same time.
+- [x] Recording can be started, paused, stopped, and redone; the audio file is saved and linked to the voice memo. *Audited 2026-10-14; redo is available until "Save & transcribe".*
+- [x] Whisper returns a timestamped transcription in the `[word, start, end, confidence]` shape, stored alongside the user's edited text. *Stored as `{word,start,end,confidence}` dicts to match Cortico (prototype log).*
 
-* [ ] Recording stops automatically at 20 minutes.
+* [x] Recording stops automatically at 20 minutes. *Also enforced server-side from `config.voice_memo`; the frontend hard-codes 1200s.*
 
-- [ ] A second voice memo can be recorded for the same transcript, and its entries appear after the first memo's entries in the memo.
+- [x] A second voice memo can be recorded for the same transcript, and its entries appear after the first memo's entries in the memo. *Order follows when each memo's connections were filed, not `recorded_at`, so reviewing an older memo later sorts it after the newer one.*
 
 **Review and filing**
 
-- [ ] The review step shows the transcription next to proposed RQ connections, each with evidence passages badged `yours` or `AI-suggested`.
-- [ ] Starred highlights always appear among candidate evidence; the user's other highlights are preferred over unhighlighted text.
-- [ ] Each connection can be accepted, edited, or rejected, and the user can add one the AI missed.
-- [ ] Nothing reaches the memo before "File to memo"; rejected proposals stay in the log with status `rejected`.
-- [ ] A reflection that fits no RQ is shown as unmapped, not forced into one.
+- [ ] The review step shows the transcription next to proposed RQ connections, each with evidence passages badged `yours` or `AI-suggested`. *Not met (audited 2026-10-14): evidence is badged `yours` only on an exact match with a **starred** highlight span, and `connection_evidence.highlight_id` is never set, so the user's non-starred highlights show as `AI-suggested`. All 85 evidence rows in the dev db are `source=ai`.*
+- [ ] Starred highlights always appear among candidate evidence; the user's other highlights are preferred over unhighlighted text. *Not met (audited 2026-10-14): enforced only by the prompt, with no deterministic inclusion, and blocked by the same `highlight_id` gap.*
+- [x] Each connection can be accepted, edited, or rejected, and the user can add one the AI missed. *Review-step edit covers insight text only (no RQ reassignment or evidence changes in the UI, though the backend accepts them); a manually added connection has no evidence.*
+- [x] Nothing reaches the memo before "File to memo"; rejected proposals stay in the log with status `rejected`.
+- [x] A reflection that fits no RQ is shown as unmapped, not forced into one.
 
-* [ ] A starred highlight the voice memo never mentions is offered in review for RQ assignment; if left unassigned, it appears under "Starred, unassigned" on the memo page.
+* [ ] A starred highlight the voice memo never mentions is offered in review for RQ assignment; if left unassigned, it appears under "Starred, unassigned" on the memo page. *Partial (audited 2026-10-14): review lists these highlights but has no control to assign one to an RQ, and because `highlight_id` is never set, starred highlights the AI *did* cite also show up as unassigned.*
 
-- [ ] AI review calls use `gpt-5.6-luna` at `low` reasoning effort, set in config.
-- [ ] The review prompt can be viewed, edited, saved, and reset to default from the UI, and the next review uses the saved version.
+- [x] AI review calls use `gpt-5.6-luna` at `low` reasoning effort, set in config.
+- [x] The review prompt can be viewed, edited, saved, and reset to default from the UI, and the next review uses the saved version.
 
 **Memo**
 
-- [ ] The full memo page shows one section per RQ with entries that link back to transcript passages and to the voice recording.
-- [ ] The side-panel memo shows the same entries, compactly, while reading another transcript.
+- [ ] The full memo page shows one section per RQ with entries that link back to transcript passages and to the voice recording. *Partial (audited 2026-10-14): evidence links open the conversation at the top (`/?conversation=N`), not the cited passage; the recording link works.*
+- [x] The side-panel memo shows the same entries, compactly, while reading another transcript. *Omits the unmapped and starred-unassigned groups.*
 
-* [ ] A filed entry can be edited (insight text and evidence) and retracted from the memo page, and prior versions are kept.
+* [x] A filed entry can be edited (insight text and evidence) and retracted from the memo page, and prior versions are kept. *Evidence can be removed but not added from the memo page; revisions go to `reflection_connection_revision`.*
 
 **Data**
 
-- [ ] The prototype's database role cannot write to any Cortico table.
-- [ ] All new tables follow the data model section, and any deviation from `schema.sql` is noted in the prototype log.
-- [ ] Audio and data dumps are gitignored.
+- [x] The prototype's database role cannot write to any Cortico table. *SQLite snapshot, so enforced by a read-only engine (`mode=ro&immutable=1` + `PRAGMA query_only`) instead of a DB role (prototype log).*
+- [x] All new tables follow the data model section, and any deviation from `schema.sql` is noted in the prototype log. *Previously unlogged deviations added to the log 2026-10-14.*
+- [x] Audio and data dumps are gitignored.
 
 ## Open questions
 
-- [ ] **Dismissed prompt:** decided that leaving a transcript without a recorded reflection triggers a confirmation dialog (see End-of-transcript prompt). Still open: should the dialog also appear when the user leaves before reaching the end of the transcript?
+- [x] **Dismissed prompt:** decided that leaving a transcript without a recorded reflection triggers a confirmation dialog (see End-of-transcript prompt). *Decided 2026-10-14: yes, it also appears when the user leaves before the end, as long as they engaged with the transcript (highlighted, dropped a checkpoint, or reached the end). Opening a transcript and leaving without doing anything doesn't trigger it.*
 - [ ] **Facilitator-question sections:** decided for now: users mark sections manually with checkpoints. Still open: V2 conversation guides belong to a project and a conversation has no guide ID, so which guide version applies to a transcript? Assumed: the project's latest published version.
 - [ ] **Memo editing after filing:** decided: the memo is a live doc, so filed entries stay editable and can be retracted. The data model supports it through `status`, and the edit controls are described under Memo page and side-panel memo.
 - [ ] **Multiple reflections per transcript:** decided: a user can record more than one voice memo for the same transcript, and later ones are appended after earlier ones in recording order.
 - [ ] **Recording length:** decided: 20 minutes is the maximum voice memo length for transcription speed and cost.
 - [ ] **Which model reviews the memo:** decided: GPT-5.6 Luna at low reasoning effort, with a prompt the user can edit. Still open: how its outputs are validated against the transcript.
 - [ ] **Starred highlights without a reflection:** decided: starred highlights that the voice memo never mentions still get filed as evidence. In review they are offered for assignment to an RQ; any left unassigned are listed as starred and unassigned on the memo page.
-- [ ] **Consent for real users:** what consent and retention flow is needed before community members, not just the author, record voice memos?
+- [x] **Consent for real users:** what consent and retention flow is needed before community members, not just the author, record voice memos? *Decided 2026-10-14: assumed for now; not building a consent/retention flow in the prototype.*
 
 ## Follow-up work
 

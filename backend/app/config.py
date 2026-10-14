@@ -27,6 +27,12 @@ class VoiceMemoConfig(BaseModel):
     max_duration_seconds: int
 
 
+class CodeFamiliesConfig(BaseModel):
+    max_per_rq: int  # cap on non-dismissed, non-merged families per RQ (user can override)
+    near_cap_at: int  # at or above this many, synthesis also proposes merges
+    max_new_per_run: int
+
+
 class Config(BaseModel):
     default_user_id: int
     default_project_id: int
@@ -36,6 +42,7 @@ class Config(BaseModel):
     ai_review: AIReviewConfig
     transcription: TranscriptionConfig
     voice_memo: VoiceMemoConfig
+    code_families: CodeFamiliesConfig
 
     @property
     def project_root(self) -> Path:
