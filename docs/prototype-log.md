@@ -208,9 +208,11 @@ Closes the four Phase 1 acceptance criteria the 2026-10-14 audit left open, all 
   span overlaps a highlight. It never deletes rows or changes linked ones, so it's safe to
   re-run. On a copy of `db/prototype.db`, 83 of the 85 evidence rows linked (none to a
   starred highlight, since the dev db has none), and a second run found nothing more to
-  do. **Not yet run on the real dev db**; to apply it:
-  `cd backend && .venv/bin/python scripts/backfill_evidence_highlights.py`.
+  do. Run on the real dev db 2026-10-26 (after a copy to `db/prototype.pre-backfill.db`):
+  135 of 139 unlinked evidence rows linked, the other 4 overlap no highlight, and a second
+  dry run found nothing more to do.
 - Tests: `backend/tests/test_evidence_provenance.py` (overlap matching, AI linking and
   ordering, starred coverage incl. rejected/unmapped citers, review assignment, foreign
-  highlight refused, memo edit keeps link). Frontend changes were type-checked
-  (`tsc -b`) but not exercised in a browser.
+  highlight refused, memo edit keeps link). Frontend changes were clicked through in the
+  browser 2026-10-26: `yours` badges on backfilled evidence, memo evidence links scrolling
+  to the cited snippet, "Assign to: RQ" in review, and "Starred, unassigned".

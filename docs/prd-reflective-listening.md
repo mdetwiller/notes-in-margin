@@ -349,14 +349,14 @@ The prototype is ready for a test round when all of these hold.
 - [x] Nothing reaches the memo before "File to memo"; rejected proposals stay in the log with status `rejected`.
 - [x] A reflection that fits no RQ is shown as unmapped, not forced into one.
 
-* [x] A starred highlight the voice memo never mentions is offered in review for RQ assignment; if left unassigned, it appears under "Starred, unassigned" on the memo page. *Verified 2026-10-14: review has an "Assign to: RQ" control per highlight, filed as a connection with that highlight as evidence. Highlights the AI cited no longer show as unassigned (`tests/test_evidence_provenance.py`). UI type-checked, not yet clicked through in a browser.*
+* [x] A starred highlight the voice memo never mentions is offered in review for RQ assignment; if left unassigned, it appears under "Starred, unassigned" on the memo page. *Verified 2026-10-14: review has an "Assign to: RQ" control per highlight, filed as a connection with that highlight as evidence. Highlights the AI cited no longer show as unassigned (`tests/test_evidence_provenance.py`). Clicked through in the browser 2026-10-26: assigning a starred highlight files it as its own entry, and the "Starred, unassigned" group lists only uncited starred highlights.*
 
 - [x] AI review calls use `gpt-5.6-luna` at `low` reasoning effort, set in config.
 - [x] The review prompt can be viewed, edited, saved, and reset to default from the UI, and the next review uses the saved version.
 
 **Memo**
 
-- [x] The full memo page shows one section per RQ with entries that link back to transcript passages and to the voice recording. *Verified 2026-10-14: evidence links go to `/?conversation=N&snippet=ID`, and the reader scrolls to and outlines that snippet. Type-checked, not yet clicked through in a browser.*
+- [x] The full memo page shows one section per RQ with entries that link back to transcript passages and to the voice recording. *Verified 2026-10-14: evidence links go to `/?conversation=N&snippet=ID`, and the reader scrolls to and outlines that snippet. Clicked through in the browser 2026-10-26.*
 - [x] The side-panel memo shows the same entries, compactly, while reading another transcript. *Omits the unmapped and starred-unassigned groups.*
 
 * [x] A filed entry can be edited (insight text and evidence) and retracted from the memo page, and prior versions are kept. *Evidence can be removed but not added from the memo page; revisions go to `reflection_connection_revision`.*
