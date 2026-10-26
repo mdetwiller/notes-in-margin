@@ -151,8 +151,8 @@ note the difference. Entries are added as they're hit, not just up front.
 - **`connection_evidence.highlight_id` is never populated** by AI review, manual adds, or
   memo-page evidence edits. As a result, review badges only say `yours` for exact matches
   with a *starred* span, and "Starred, unassigned" lists starred highlights the AI did cite.
-  All 85 evidence rows in the dev db are `source=ai`. Tracked as unmet in the Phase 1
-  acceptance criteria.
+  All 85 evidence rows in the dev db are `source=ai`. Fixed by the evidence provenance fix
+  below.
 - **Code-family cap and merges.** These aren't in `docs/prd-phase-2.md`; they come from
   resolving its granularity open question.
   - New config block `code_families` (`max_per_rq: 5`, `near_cap_at: 4`,
@@ -168,3 +168,49 @@ note the difference. Entries are added as they're hit, not just up front.
   `near_cap_at` lowered to 3 for one run, the model proposed no merges, judging RQ 3's
   three families distinct. The merge-accept path is covered only by unit tests so far, not
   a live merge.
+
+## Evidence provenance fix (2026-10-14)
+
+Closes the four Phase 1 acceptance criteria the 2026-10-14 audit left open, all caused by
+`connection_evidence.highlight_id` never being set.
+
+- **One linking rule for every evidence write** (`backend/app/evidence_provenance.py`):
+  an evidence span is linked to the user's highlight it *overlaps* on the same snippet
+  (half-open word ranges, any shared word counts), starred or not; a starred highlight wins
+  ties, then the larger overlap, then the older highlight. A linked span gets
+  `highlight_id` and `source="user"`; an unlinked one keeps its source (`ai` for the
+  model's). The old rule was an exact span match against *starred* highlights only.
+- **AI review** (`services/ai_review.py`): persistence is split into
+  `persist_review_result` (testable without a model call). Evidence is linked as above and
+  ordered starred-highlight → other highlight → AI-only text within each connection, the
+  deterministic half of "prefer the user's highlights". Duplicate spans from the model are
+  dropped.
+- **Review-step adds/edits and memo-page evidence edits** (`routers/review.py`,
+  `routers/memo.py`) go through `evidence_row`, which keeps an explicit `highlight_id`
+  (refusing one from another user/conversation with a 400) and otherwise links by
+  overlap. So the memo page's "remove evidence" no longer drops the link, even though it
+  sends evidence back without `highlight_id`. Revision snapshots now include `highlight_id`.
+- **"Starred, unassigned" is now deterministic:** a starred highlight counts as assigned
+  only when it's cited by a connection that has an RQ and isn't rejected/retracted
+  (`assigned_highlight_ids`). Review and memo use the same rule. Change from before:
+  citation by an *unmapped* connection no longer counts as assigned, since the criterion
+  is about RQ assignment.
+- **Assigning a starred highlight in review** (`ReviewStep.tsx`): each starred-unassigned
+  highlight has an "Assign to: RQ" select. On "File to memo" each assigned one becomes its
+  own accepted connection, with the highlight's spans as `user` evidence carrying its
+  `highlight_id`. Insight text defaults to the margin memo, else the quoted passage. Like
+  everything else in review, nothing is written before "File to memo".
+- **Memo evidence links** now go to `/?conversation=N&snippet=ID`. `ReaderPage` scrolls
+  the cited snippet into view once per page load and outlines it briefly. Memo entries'
+  evidence now includes `highlight_id`.
+- **Backfill** (`backend/scripts/backfill_evidence_highlights.py`, additive): sets
+  `highlight_id` (and `source="user"`) only on rows where `highlight_id` is null and the
+  span overlaps a highlight. It never deletes rows or changes linked ones, so it's safe to
+  re-run. On a copy of `db/prototype.db`, 83 of the 85 evidence rows linked (none to a
+  starred highlight, since the dev db has none), and a second run found nothing more to
+  do. **Not yet run on the real dev db**; to apply it:
+  `cd backend && .venv/bin/python scripts/backfill_evidence_highlights.py`.
+- Tests: `backend/tests/test_evidence_provenance.py` (overlap matching, AI linking and
+  ordering, starred coverage incl. rejected/unmapped citers, review assignment, foreign
+  highlight refused, memo edit keeps link). Frontend changes were type-checked
+  (`tsc -b`) but not exercised in a browser.

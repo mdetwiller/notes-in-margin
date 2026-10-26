@@ -319,7 +319,7 @@ Illustrative shapes for the main prototype-owned objects. Field names follow the
 
 The prototype is ready for a test round when all of these hold.
 
-*Audit 2026-10-14: 21 of 25 met. The 4 open items are all review/memo evidence-provenance gaps, most traced to `connection_evidence.highlight_id` never being populated.*
+*Audit 2026-10-14: 21 of 25 met. The 4 open items were all review/memo evidence-provenance gaps, most traced to `connection_evidence.highlight_id` never being populated; the evidence provenance fix (prototype log) closes them, so 25 of 25 are now met.*
 
 **Reader and RQs**
 
@@ -343,20 +343,20 @@ The prototype is ready for a test round when all of these hold.
 
 **Review and filing**
 
-- [ ] The review step shows the transcription next to proposed RQ connections, each with evidence passages badged `yours` or `AI-suggested`. *Not met (audited 2026-10-14): evidence is badged `yours` only on an exact match with a **starred** highlight span, and `connection_evidence.highlight_id` is never set, so the user's non-starred highlights show as `AI-suggested`. All 85 evidence rows in the dev db are `source=ai`.*
-- [ ] Starred highlights always appear among candidate evidence; the user's other highlights are preferred over unhighlighted text. *Not met (audited 2026-10-14): enforced only by the prompt, with no deterministic inclusion, and blocked by the same `highlight_id` gap.*
+- [x] The review step shows the transcription next to proposed RQ connections, each with evidence passages badged `yours` or `AI-suggested`. *Verified 2026-10-14: AI evidence that overlaps any of the user's highlights (starred or not) is linked via `highlight_id` and badged `yours`; review adds/edits and memo edits link the same way (`tests/test_evidence_provenance.py`). Existing dev-db rows need the additive backfill script (prototype log).*
+- [x] Starred highlights always appear among candidate evidence; the user's other highlights are preferred over unhighlighted text. *Verified 2026-10-14: after the model returns, every starred highlight is either cited by an RQ connection or returned as starred-unassigned, whatever the model did. Evidence is ordered starred → other highlights → AI-only text (`tests/test_evidence_provenance.py`).*
 - [x] Each connection can be accepted, edited, or rejected, and the user can add one the AI missed. *Review-step edit covers insight text only (no RQ reassignment or evidence changes in the UI, though the backend accepts them); a manually added connection has no evidence.*
 - [x] Nothing reaches the memo before "File to memo"; rejected proposals stay in the log with status `rejected`.
 - [x] A reflection that fits no RQ is shown as unmapped, not forced into one.
 
-* [ ] A starred highlight the voice memo never mentions is offered in review for RQ assignment; if left unassigned, it appears under "Starred, unassigned" on the memo page. *Partial (audited 2026-10-14): review lists these highlights but has no control to assign one to an RQ, and because `highlight_id` is never set, starred highlights the AI *did* cite also show up as unassigned.*
+* [x] A starred highlight the voice memo never mentions is offered in review for RQ assignment; if left unassigned, it appears under "Starred, unassigned" on the memo page. *Verified 2026-10-14: review has an "Assign to: RQ" control per highlight, filed as a connection with that highlight as evidence. Highlights the AI cited no longer show as unassigned (`tests/test_evidence_provenance.py`). UI type-checked, not yet clicked through in a browser.*
 
 - [x] AI review calls use `gpt-5.6-luna` at `low` reasoning effort, set in config.
 - [x] The review prompt can be viewed, edited, saved, and reset to default from the UI, and the next review uses the saved version.
 
 **Memo**
 
-- [ ] The full memo page shows one section per RQ with entries that link back to transcript passages and to the voice recording. *Partial (audited 2026-10-14): evidence links open the conversation at the top (`/?conversation=N`), not the cited passage; the recording link works.*
+- [x] The full memo page shows one section per RQ with entries that link back to transcript passages and to the voice recording. *Verified 2026-10-14: evidence links go to `/?conversation=N&snippet=ID`, and the reader scrolls to and outlines that snippet. Type-checked, not yet clicked through in a browser.*
 - [x] The side-panel memo shows the same entries, compactly, while reading another transcript. *Omits the unmapped and starred-unassigned groups.*
 
 * [x] A filed entry can be edited (insight text and evidence) and retracted from the memo page, and prior versions are kept. *Evidence can be removed but not added from the memo page; revisions go to `reflection_connection_revision`.*

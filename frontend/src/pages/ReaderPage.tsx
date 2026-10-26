@@ -165,6 +165,24 @@ export default function ReaderPage() {
     document.querySelector(`[data-snippet-id="${snippetId}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
+  // A memo evidence link (/?conversation=N&snippet=ID) lands on the cited passage, not the
+  // top of the transcript. Once per page load, so later re-fetches don't yank the scroll.
+  const linkedSnippetHandledRef = useRef(false);
+  useEffect(() => {
+    if (linkedSnippetHandledRef.current || !conversation) return;
+    const params = new URLSearchParams(window.location.search);
+    const snippetId = Number(params.get("snippet"));
+    if (!snippetId || conversation.id !== Number(params.get("conversation"))) return;
+    linkedSnippetHandledRef.current = true;
+    requestAnimationFrame(() => {
+      jumpToSnippet(snippetId);
+      const el = document.querySelector<HTMLElement>(`[data-snippet-id="${snippetId}"]`);
+      if (!el) return;
+      el.style.outline = "2px solid #e0b84a";
+      setTimeout(() => (el.style.outline = ""), 2500);
+    });
+  }, [conversation]);
+
   async function openReview(vm: VoiceMemo) {
     // The recording and transcription are already saved at this point. The AI review call
     // is a separate, best-effort step — if it fails (e.g. no OPENAI_API_KEY configured),
