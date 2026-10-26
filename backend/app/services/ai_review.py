@@ -19,6 +19,7 @@ from openai import OpenAI
 from sqlalchemy.orm import Session
 
 from ..config import Config
+from ..evidence_provenance import highlight_spans, resolve_evidence
 from ..models_cortico import Participant, Snippet
 from ..models_prototype import (
     AppSetting,
@@ -199,7 +200,7 @@ def generate_connections(
     cortico_db: Session,
     voice_memo: VoiceMemo,
     config: Config,
-) -> ReflectionConnection.__class__:
+) -> list[ReflectionConnection]:
     """Calls the model, structurally validates its evidence, and persists every proposed
     connection with status='suggested' immediately (audit trail from the start — rejected
     proposals stay logged rather than deleted, per the PRD)."""
@@ -248,16 +249,51 @@ def generate_connections(
         },
     )
     result = json.loads(response.output_text)
+    return persist_review_result(
+        prototype_db=prototype_db,
+        cortico_db=cortico_db,
+        voice_memo=voice_memo,
+        result=result,
+        prompt=prompt,
+        config=config,
+    )
 
+
+def persist_review_result(
+    *,
+    prototype_db: Session,
+    cortico_db: Session,
+    voice_memo: VoiceMemo,
+    result: dict,
+    prompt: str,
+    config: Config,
+) -> list[ReflectionConnection]:
+    """Validates and persists the model's parsed output. Split from the API call so the
+    deterministic half (validation, highlight linking) is testable without a model.
+
+    Each evidence span is linked to the user's highlight it overlaps (any highlight,
+    starred or not) and badged `user`; the rest stay `ai`. Within a connection the user's
+    own passages are listed first, starred before other highlights — the deterministic half
+    of "prefer the user's highlights over unhighlighted text". The other half of the
+    starred-highlight guarantee lives in the review router: any starred highlight this
+    linking doesn't attach to an RQ connection is returned as starred-unassigned.
+    """
     voice_memo.extracted_interests = json.dumps(result.get("extracted_interests", []))
+    spans = highlight_spans(prototype_db, voice_memo.user_id, voice_memo.conversation_id)
+    starred_ids = {s.highlight_id for s in spans if s.starred}
 
     created: list[ReflectionConnection] = []
     for conn in result.get("connections", []):
         valid_evidence = []
+        seen: set[tuple[int, int, int]] = set()
         for ev in conn.get("evidence", []):
+            key = (ev["snippet_id"], ev["start_index"], ev["end_index"])
+            if key in seen:
+                continue
             if _validate_evidence_in_range(
                 cortico_db, voice_memo.conversation_id, ev["snippet_id"], ev["start_index"], ev["end_index"]
             ):
+                seen.add(key)
                 valid_evidence.append(ev)
             # else: dropped silently — hallucinated/out-of-range evidence never reaches review.
 
@@ -286,24 +322,27 @@ def generate_connections(
         prototype_db.add(connection)
         prototype_db.flush()  # assign connection.id
 
-        starred_snippet_ids = {
-            (ev["snippet_id"], ev["start_index"], ev["end_index"])
-            for h in _build_highlight_context(
-                prototype_db, voice_memo.user_id, voice_memo.conversation_id
+        resolved = []
+        for i, ev in enumerate(valid_evidence):
+            highlight_id, source = resolve_evidence(
+                spans,
+                snippet_id=ev["snippet_id"],
+                start_index=ev["start_index"],
+                end_index=ev["end_index"],
+                source="ai",
             )
-            if h["starred"]
-            for ev in h["snippets"]
-        }
+            rank = 0 if highlight_id in starred_ids else 1 if highlight_id is not None else 2
+            resolved.append((rank, i, ev, highlight_id, source))
 
-        for ev in valid_evidence:
-            key = (ev["snippet_id"], ev["start_index"], ev["end_index"])
+        for _, _, ev, highlight_id, source in sorted(resolved, key=lambda r: r[:2]):
             prototype_db.add(
                 ConnectionEvidence(
                     connection_id=connection.id,
+                    highlight_id=highlight_id,
                     snippet_id=ev["snippet_id"],
                     start_index=ev["start_index"],
                     end_index=ev["end_index"],
-                    source="user" if key in starred_snippet_ids else "ai",
+                    source=source,
                 )
             )
         created.append(connection)

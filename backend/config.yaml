@@ -19,3 +19,9 @@ transcription:
 
 voice_memo:
   max_duration_seconds: 1200
+
+# Code families are broad parent themes (future parents of child codes), so keep few per RQ.
+code_families:
+  max_per_rq: 5
+  near_cap_at: 4
+  max_new_per_run: 2

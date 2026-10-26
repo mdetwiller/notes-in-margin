@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, audioUrlFor } from "../lib/api";
-import type { CodeFamily, MemoEntry, MemoResponse, NextStepSuggestion } from "../lib/types";
+import type {
+  CodeFamily,
+  CodeFamilyMergeSuggestion,
+  CodeFamilyState,
+  MemoEntry,
+  MemoResponse,
+  NextStepSuggestion,
+} from "../lib/types";
 
 function formatTimestamp(seconds: number) {
   const m = Math.floor(seconds / 60);
@@ -69,7 +76,7 @@ function EntryView({ entry, onChanged }: { entry: MemoEntry; onChanged: () => vo
         Evidence:
         {entry.evidence.map((e, i) => (
           <div key={i} style={{ marginLeft: "0.5rem" }}>
-            <Link to={`/?conversation=${entry.conversation_id}`}>"{e.text || `snippet ${e.snippet_id}`}"</Link>{" "}
+            <Link to={`/?conversation=${entry.conversation_id}&snippet=${e.snippet_id}`}>"{e.text || `snippet ${e.snippet_id}`}"</Link>{" "}
             ({e.source === "user" ? "yours" : "AI-suggested"}
             {e.starred ? ", starred" : ""})
             <button style={{ fontSize: "0.7rem" }} onClick={() => removeEvidence(i)}>
@@ -216,33 +223,93 @@ function CodeFamilyCard({ family, onChanged }: { family: CodeFamily; onChanged: 
   );
 }
 
-function CodeFamiliesSection({ researchQuestionId }: { researchQuestionId: number }) {
-  const [families, setFamilies] = useState<CodeFamily[]>([]);
-  const [synthesizing, setSynthesizing] = useState(false);
+function MergeSuggestionCard({
+  merge,
+  families,
+  onChanged,
+}: {
+  merge: CodeFamilyMergeSuggestion;
+  families: CodeFamily[];
+  onChanged: (state?: CodeFamilyState) => void;
+}) {
+  const names = merge.family_ids.map((id) => families.find((f) => f.id === id)?.name ?? `#${id}`);
 
-  function refresh() {
-    api.listCodeFamilies(researchQuestionId).then(setFamilies);
+  async function accept() {
+    onChanged(await api.acceptCodeFamilyMerge(merge.id));
   }
 
-  useEffect(refresh, [researchQuestionId]);
+  async function dismiss() {
+    await api.dismissCodeFamilyMerge(merge.id);
+    onChanged();
+  }
 
-  async function synthesize() {
+  return (
+    <div className="memo-entry" style={{ borderLeft: "3px solid #e0b84a", paddingLeft: "0.6rem" }}>
+      <div className="meta">Suggested merge: {names.join(" + ")}</div>
+      <strong>{merge.proposed_name}</strong>
+      <p style={{ margin: 0 }}>{merge.proposed_definition}</p>
+      {merge.rationale && (
+        <p className="meta" style={{ margin: "0.2rem 0" }}>
+          {merge.rationale}
+        </p>
+      )}
+      <button className="primary" onClick={accept}>
+        Merge
+      </button>
+      <button className="secondary" onClick={dismiss} style={{ marginLeft: "0.3rem" }}>
+        Keep separate
+      </button>
+    </div>
+  );
+}
+
+function CodeFamiliesSection({ researchQuestionId }: { researchQuestionId: number }) {
+  const [state, setState] = useState<CodeFamilyState | null>(null);
+  const [synthesizing, setSynthesizing] = useState(false);
+
+  function refresh(next?: CodeFamilyState) {
+    if (next) setState(next);
+    else api.getCodeFamilyState(researchQuestionId).then(setState);
+  }
+
+  useEffect(() => refresh(), [researchQuestionId]);
+
+  async function synthesize(overrideCap = false) {
     setSynthesizing(true);
     try {
-      const result = await api.synthesizeCodeFamilies(researchQuestionId);
-      setFamilies(result);
+      setState(await api.synthesizeCodeFamilies(researchQuestionId, overrideCap));
     } finally {
       setSynthesizing(false);
     }
   }
 
+  const cap = state?.cap;
   return (
     <div style={{ marginTop: "0.75rem" }}>
-      <button className="secondary" onClick={synthesize} disabled={synthesizing}>
+      <button className="secondary" onClick={() => synthesize()} disabled={synthesizing}>
         {synthesizing ? "Synthesizing…" : "Synthesize code families"}
       </button>
-      {families.map((f) => (
-        <CodeFamilyCard key={f.id} family={f} onChanged={refresh} />
+      {cap && cap.live_count > 0 && (
+        <span className="meta" style={{ marginLeft: "0.5rem" }}>
+          {cap.live_count} of {cap.max_per_rq} families
+        </span>
+      )}
+      {cap?.at_cap && (
+        <p className="meta" style={{ margin: "0.4rem 0" }}>
+          {state!.withheld_new_families > 0
+            ? `At the ${cap.max_per_rq}-family cap — ${state!.withheld_new_families} new theme${state!.withheld_new_families > 1 ? "s were" : " was"} held back. `
+            : `At the ${cap.max_per_rq}-family cap, so synthesis only attaches entries to existing families. `}
+          Merge or dismiss a family to make room, or{" "}
+          <button className="secondary" style={{ padding: "0.1rem 0.5rem" }} onClick={() => synthesize(true)} disabled={synthesizing}>
+            synthesize past the cap
+          </button>
+        </p>
+      )}
+      {state?.merge_suggestions.map((m) => (
+        <MergeSuggestionCard key={m.id} merge={m} families={state.families} onChanged={refresh} />
+      ))}
+      {state?.families.map((f) => (
+        <CodeFamilyCard key={f.id} family={f} onChanged={() => refresh()} />
       ))}
     </div>
   );

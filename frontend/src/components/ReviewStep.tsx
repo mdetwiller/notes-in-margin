@@ -45,6 +45,9 @@ export default function ReviewStep({
   const [decisions, setDecisions] = useState<Record<number, Decision>>({});
   const [newInsight, setNewInsight] = useState("");
   const [newRqId, setNewRqId] = useState<number | "">("");
+  // Starred highlights the AI didn't cite, assigned to an RQ here. Each becomes a new
+  // connection with the highlight as its evidence when the user files to memo.
+  const [starredAssignments, setStarredAssignments] = useState<Record<number, number>>({});
 
   const activeConnections = review.connections.filter((c) => c.status === "suggested");
 
@@ -81,6 +84,26 @@ export default function ReviewStep({
         research_question_id: newRqId === "" ? null : newRqId,
         insight_text: newInsight,
         evidence: [],
+      });
+    }
+    for (const h of review.starred_unassigned) {
+      const rqId = starredAssignments[h.highlight_id];
+      if (rqId === undefined) continue;
+      fileDecisions.push({
+        connection_id: null as unknown as number,
+        action: "accept",
+        research_question_id: rqId,
+        insight_text:
+          h.notes?.trim() ||
+          h.snippets.map((s) => s.text).filter(Boolean).join(" … ") ||
+          "Starred highlight",
+        evidence: h.snippets.map((s) => ({
+          highlight_id: h.highlight_id,
+          snippet_id: s.snippet_id,
+          start_index: s.start_index,
+          end_index: s.end_index,
+          source: "user" as const,
+        })),
       });
     }
     onFile(
@@ -175,12 +198,35 @@ export default function ReviewStep({
               <div style={{ marginTop: "1rem" }}>
                 <h4>Starred highlights needing an RQ</h4>
                 {review.starred_unassigned.map((h) => (
-                  <div key={h.highlight_id} style={{ fontSize: "0.85rem" }}>
+                  <div key={h.highlight_id} style={{ fontSize: "0.85rem", marginBottom: "0.4rem" }}>
                     ★ {h.notes || "(no memo text)"}
+                    {h.snippets[0]?.text && <span style={{ color: "#888" }}> — "{h.snippets[0].text}"</span>}
+                    <div>
+                      <select
+                        aria-label="Assign to research question"
+                        value={starredAssignments[h.highlight_id] ?? ""}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setStarredAssignments((prev) => {
+                            const next = { ...prev };
+                            if (value === "") delete next[h.highlight_id];
+                            else next[h.highlight_id] = Number(value);
+                            return next;
+                          });
+                        }}
+                      >
+                        <option value="">Leave unassigned</option>
+                        {researchQuestions.map((rq) => (
+                          <option key={rq.id} value={rq.id}>
+                            Assign to: {rq.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 ))}
                 <p style={{ fontSize: "0.75rem", color: "#999" }}>
-                  Left unassigned, these will appear under "Starred, unassigned" on the memo page.
+                  An assigned highlight is filed as its own entry, with the highlight as evidence. Left unassigned, these will appear under "Starred, unassigned" on the memo page.
                 </p>
               </div>
             )}

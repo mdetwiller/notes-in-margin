@@ -194,7 +194,9 @@ class CodeFamily(PrototypeBase):
     research_question_id = Column(Integer, ForeignKey("research_question.id"), nullable=False)
     name = Column(String, nullable=False)
     definition = Column(Text, nullable=False)
-    status = Column(String, nullable=False, default="suggested")  # suggested -> accepted | dismissed
+    # suggested -> accepted | dismissed; also "merged" once folded into another family by an
+    # accepted CodeFamilyMergeSuggestion (kept logged, not deleted, like dismissed ones)
+    status = Column(String, nullable=False, default="suggested")
     ai_metadata = Column(Text)  # JSON: {model, reasoning_effort, prompt}
     created_at = Column(DateTime, nullable=False, default=_now)
     updated_at = Column(DateTime, nullable=False, default=_now, onupdate=_now)
@@ -209,6 +211,27 @@ class CodeFamilyMember(PrototypeBase):
     id = Column(Integer, primary_key=True)
     code_family_id = Column(Integer, ForeignKey("code_family.id"), nullable=False)
     connection_id = Column(Integer, ForeignKey("reflection_connection.id"), nullable=False)
+
+
+class CodeFamilyMergeSuggestion(PrototypeBase):
+    """An AI-proposed merge of two or more of an RQ's code families, offered once the RQ
+    nears its family cap (config.code_families). Accepting folds every source family's
+    members into target_family_id, renames it to the proposed name/definition, and marks the
+    other source families "merged". Not in docs/prd-phase-2.md — see docs/prototype-log.md."""
+
+    __tablename__ = "code_family_merge_suggestion"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False)
+    research_question_id = Column(Integer, ForeignKey("research_question.id"), nullable=False)
+    family_ids_json = Column(Text, nullable=False)  # JSON list of code_family ids being merged
+    target_family_id = Column(Integer, ForeignKey("code_family.id"), nullable=False)
+    proposed_name = Column(String, nullable=False)
+    proposed_definition = Column(Text, nullable=False)
+    rationale = Column(Text)
+    status = Column(String, nullable=False, default="suggested")  # suggested -> accepted | dismissed
+    ai_metadata = Column(Text)  # JSON: {model, reasoning_effort, prompt}
+    created_at = Column(DateTime, nullable=False, default=_now)
+    updated_at = Column(DateTime, nullable=False, default=_now, onupdate=_now)
 
 
 class AppSetting(PrototypeBase):

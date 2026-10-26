@@ -27,7 +27,7 @@ export default function ReaderPage() {
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [researchQuestions, setResearchQuestions] = useState<ResearchQuestion[]>([]);
   const [memo, setMemo] = useState<MemoResponse | null>(null);
-  const [filedVoiceMemoExists, setFiledVoiceMemoExists] = useState(false);
+  const [recordedVoiceMemoExists, setRecordedVoiceMemoExists] = useState(false);
   const [attentionVoiceMemos, setAttentionVoiceMemos] = useState<
     { vm: VoiceMemo; pendingCount: number }[]
   >([]);
@@ -72,7 +72,9 @@ export default function ReaderPage() {
 
   async function refreshVoiceMemoStatus(id: number) {
     const vms = await api.listVoiceMemosForConversation(id);
-    setFiledVoiceMemoExists(vms.some((vm) => vm.status === "filed"));
+    // Any recording counts as "reflected" for the leave dialog, even one not yet reviewed
+    // or filed — the attention banner already covers finishing those.
+    setRecordedVoiceMemoExists(vms.some((vm) => vm.status !== "failed"));
 
     // A reflection needs attention if it was never reviewed at all, or if it has any
     // connection still sitting as "suggested" — e.g. one the user never got to decide on
@@ -101,8 +103,15 @@ export default function ReaderPage() {
   }
 
   function hasUnsavedReflectionRisk() {
-    const hasAnnotations = highlights.length > 0;
-    return hasAnnotations && !filedVoiceMemoExists;
+    // Confirm leaving whenever the user has engaged with this transcript at all — reached
+    // the end, highlighted, or dropped a checkpoint — not only once they've reached the
+    // end. Merely opening a transcript and leaving doesn't count, so browsing the
+    // conversation list doesn't nag.
+    const engaged =
+      reachedEndRef.current ||
+      highlights.length > 0 ||
+      !!conversation?.guide_questions.some((q) => q.checkpoint_snippet_id !== null);
+    return engaged && !recordedVoiceMemoExists;
   }
 
   function requestSwitch(nextId: number) {
@@ -156,6 +165,24 @@ export default function ReaderPage() {
     document.querySelector(`[data-snippet-id="${snippetId}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
+  // A memo evidence link (/?conversation=N&snippet=ID) lands on the cited passage, not the
+  // top of the transcript. Once per page load, so later re-fetches don't yank the scroll.
+  const linkedSnippetHandledRef = useRef(false);
+  useEffect(() => {
+    if (linkedSnippetHandledRef.current || !conversation) return;
+    const params = new URLSearchParams(window.location.search);
+    const snippetId = Number(params.get("snippet"));
+    if (!snippetId || conversation.id !== Number(params.get("conversation"))) return;
+    linkedSnippetHandledRef.current = true;
+    requestAnimationFrame(() => {
+      jumpToSnippet(snippetId);
+      const el = document.querySelector<HTMLElement>(`[data-snippet-id="${snippetId}"]`);
+      if (!el) return;
+      el.style.outline = "2px solid #e0b84a";
+      setTimeout(() => (el.style.outline = ""), 2500);
+    });
+  }, [conversation]);
+
   async function openReview(vm: VoiceMemo) {
     // The recording and transcription are already saved at this point. The AI review call
     // is a separate, best-effort step — if it fails (e.g. no OPENAI_API_KEY configured),
@@ -180,6 +207,7 @@ export default function ReaderPage() {
   }
 
   async function handleRecorded(vm: VoiceMemo) {
+    setRecordedVoiceMemoExists(true);
     await openReview(vm);
   }
 
@@ -207,7 +235,7 @@ export default function ReaderPage() {
     setReviewResult(null);
     setActiveVoiceMemo(null);
     setReviewError(null);
-    setFiledVoiceMemoExists(true);
+    setRecordedVoiceMemoExists(true);
     refreshMemo();
     if (conversationId !== null) refreshVoiceMemoStatus(conversationId);
   }
@@ -296,6 +324,13 @@ export default function ReaderPage() {
           onRecorded={handleRecorded}
           onClose={() => setShowReflectionPanel(false)}
         />
+      )}
+
+      {activeVoiceMemo && !reviewResult && !reviewError && (
+        <div className="reflection-panel" style={{ padding: "1.5rem", fontFamily: "sans-serif" }}>
+          Reviewing your reflection against your research questions… this calls out to the AI
+          and can take a few seconds.
+        </div>
       )}
 
       {activeVoiceMemo && reviewResult && (

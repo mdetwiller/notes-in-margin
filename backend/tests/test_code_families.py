@@ -6,8 +6,24 @@ from fastapi.testclient import TestClient
 
 from app.db import PrototypeSession
 from app.main import app
-from app.models_prototype import CodeFamily, CodeFamilyMember, ReflectionConnection, ResearchQuestion, VoiceMemo
-from app.services.code_families import _apply_family_results, _valid_connection_ids
+import json
+
+from app.config import CodeFamiliesConfig
+from app.models_prototype import (
+    CodeFamily,
+    CodeFamilyMember,
+    CodeFamilyMergeSuggestion,
+    ReflectionConnection,
+    ResearchQuestion,
+    VoiceMemo,
+)
+from app.services.code_families import (
+    _apply_family_results,
+    _apply_merge_suggestions,
+    _valid_connection_ids,
+    accept_merge,
+    cap_status,
+)
 
 client = TestClient(app)
 
@@ -74,7 +90,7 @@ def test_apply_family_results_creates_new_family_with_valid_members_only():
                 "member_connection_ids": [c1.id, c2.id, 999_999],  # last one invalid, must be dropped
             }
         ]
-        touched = _apply_family_results(
+        touched, _ = _apply_family_results(
             db,
             research_question_id=rq.id,
             user_id=80001,
@@ -115,7 +131,7 @@ def test_apply_family_results_attaches_to_existing_family_instead_of_duplicating
                 "member_connection_ids": [c1.id, c2.id],  # c1 already a member, c2 new
             }
         ]
-        touched = _apply_family_results(
+        touched, _ = _apply_family_results(
             db,
             research_question_id=rq.id,
             user_id=80001,
@@ -146,7 +162,7 @@ def test_apply_family_results_drops_family_with_no_valid_members():
                 "member_connection_ids": [999_999],
             }
         ]
-        touched = _apply_family_results(
+        touched, _ = _apply_family_results(
             db,
             research_question_id=rq.id,
             user_id=80001,
@@ -175,7 +191,7 @@ def test_apply_family_results_falls_back_to_new_family_when_existing_id_invalid(
                 "member_connection_ids": [c1.id],
             }
         ]
-        touched = _apply_family_results(
+        touched, _ = _apply_family_results(
             db,
             research_question_id=rq.id,
             user_id=80001,
@@ -249,3 +265,159 @@ def test_dismissed_family_hidden_by_default_but_not_deleted():
 def test_synthesize_on_unknown_research_question_404s():
     resp = client.post("/research_questions/999999/code_families/synthesize")
     assert resp.status_code == 404
+
+
+_LIMITS = CodeFamiliesConfig(max_per_rq=5, near_cap_at=4, max_new_per_run=2)
+
+
+def _make_family(db, rq_id, name="fam", status="suggested", member_ids=()):
+    f = CodeFamily(user_id=80001, research_question_id=rq_id, name=name, definition="d", status=status)
+    db.add(f)
+    db.commit()
+    db.refresh(f)
+    for cid in member_ids:
+        db.add(CodeFamilyMember(code_family_id=f.id, connection_id=cid))
+    db.commit()
+    db.refresh(f)
+    return f
+
+
+def test_cap_status_limits_new_families_per_run_and_per_rq():
+    assert cap_status(0, _LIMITS, override_cap=False).max_new_this_run == 2
+    assert cap_status(0, _LIMITS, override_cap=False).near_cap is False
+    four = cap_status(4, _LIMITS, override_cap=False)
+    assert four.max_new_this_run == 1 and four.near_cap is True
+    assert cap_status(5, _LIMITS, override_cap=False).max_new_this_run == 0
+    # the user can opt past the cap, but still only max_new_per_run at a time
+    assert cap_status(5, _LIMITS, override_cap=True).max_new_this_run == 2
+    assert cap_status(9, _LIMITS, override_cap=True).max_new_this_run == 2
+
+
+def test_apply_family_results_withholds_new_families_beyond_max_new_but_still_attaches():
+    db = PrototypeSession()
+    try:
+        rq = _make_rq(db)
+        c1, c2, c3 = (_make_connection(db, rq.id) for _ in range(3))
+        existing = _make_family(db, rq.id, status="accepted")
+        raw = [
+            {"existing_family_id": None, "name": "New A", "definition": "a", "member_connection_ids": [c1.id]},
+            {"existing_family_id": None, "name": "New B", "definition": "b", "member_connection_ids": [c2.id]},
+            {"existing_family_id": existing.id, "name": None, "definition": None, "member_connection_ids": [c3.id]},
+        ]
+        touched, withheld = _apply_family_results(
+            db,
+            research_question_id=rq.id,
+            user_id=80001,
+            raw_families=raw,
+            valid_connection_ids={c1.id, c2.id, c3.id},
+            existing_family_ids={existing.id},
+            ai_metadata=_DEFAULT_AI_METADATA,
+            max_new=1,
+        )
+        assert withheld == 1
+        assert [f.name for f in touched] == ["New A", existing.name]
+        assert {m.connection_id for m in existing.members} == {c3.id}
+        names = {f.name for f in db.query(CodeFamily).filter(CodeFamily.research_question_id == rq.id)}
+        assert "New B" not in names
+    finally:
+        db.close()
+
+
+def test_apply_merge_suggestions_validates_ids_and_skips_pending_duplicates():
+    db = PrototypeSession()
+    try:
+        rq = _make_rq(db)
+        other_rq = _make_rq(db)
+        a = _make_family(db, rq.id, status="suggested")
+        b = _make_family(db, rq.id, status="accepted")
+        foreign = _make_family(db, other_rq.id)
+        raw = [
+            {"family_ids": [a.id, b.id], "name": "Broad", "definition": "d", "rationale": "overlap"},
+            {"family_ids": [b.id, a.id], "name": "Dup", "definition": "d", "rationale": "same set"},
+            {"family_ids": [a.id, foreign.id], "name": "Bad", "definition": "d", "rationale": "x"},
+        ]
+        created = _apply_merge_suggestions(
+            db,
+            research_question_id=rq.id,
+            user_id=80001,
+            raw_merges=raw,
+            live_family_ids={a.id, b.id},
+            ai_metadata=_DEFAULT_AI_METADATA,
+        )
+        assert len(created) == 1
+        assert set(json.loads(created[0].family_ids_json)) == {a.id, b.id}
+        assert created[0].target_family_id == b.id  # the accepted family survives
+
+        again = _apply_merge_suggestions(
+            db, research_question_id=rq.id, user_id=80001, raw_merges=raw[:1],
+            live_family_ids={a.id, b.id}, ai_metadata=_DEFAULT_AI_METADATA,
+        )
+        assert again == []  # already pending, not stacked up
+    finally:
+        db.close()
+
+
+def test_accept_merge_folds_members_into_target_and_keeps_sources_logged():
+    db = PrototypeSession()
+    try:
+        rq = _make_rq(db)
+        c1, c2, c3 = (_make_connection(db, rq.id) for _ in range(3))
+        a = _make_family(db, rq.id, name="A", member_ids=[c1.id, c2.id])
+        b = _make_family(db, rq.id, name="B", status="accepted", member_ids=[c2.id, c3.id])
+        suggestion = CodeFamilyMergeSuggestion(
+            user_id=80001, research_question_id=rq.id, family_ids_json=json.dumps([a.id, b.id]),
+            target_family_id=b.id, proposed_name="A+B", proposed_definition="broader", status="suggested",
+        )
+        db.add(suggestion)
+        db.commit()
+
+        target = accept_merge(db, suggestion)
+        assert target.id == b.id
+        assert target.name == "A+B" and target.definition == "broader" and target.status == "accepted"
+        assert sorted(m.connection_id for m in target.members) == sorted([c1.id, c2.id, c3.id])
+        db.refresh(a)
+        assert a.status == "merged"
+        assert {m.connection_id for m in a.members} == {c1.id, c2.id}  # source kept intact
+        assert suggestion.status == "accepted"
+    finally:
+        db.close()
+
+
+def test_accept_merge_refuses_when_a_family_was_dismissed_since():
+    db = PrototypeSession()
+    try:
+        rq = _make_rq(db)
+        a = _make_family(db, rq.id)
+        b = _make_family(db, rq.id, status="dismissed")
+        suggestion = CodeFamilyMergeSuggestion(
+            user_id=80001, research_question_id=rq.id, family_ids_json=json.dumps([a.id, b.id]),
+            target_family_id=a.id, proposed_name="x", proposed_definition="y", status="suggested",
+        )
+        db.add(suggestion)
+        db.commit()
+        merge_id, rq_id = suggestion.id, rq.id
+    finally:
+        db.close()
+
+    assert client.post(f"/code_family_merges/{merge_id}/accept").status_code == 409
+    # and a stale suggestion isn't shown as pending
+    state = client.get(f"/research_questions/{rq_id}/code_families/state").json()
+    assert state["merge_suggestions"] == []
+
+
+def test_state_endpoint_reports_cap_and_hides_merged_families():
+    db = PrototypeSession()
+    try:
+        rq = _make_rq(db)
+        for i in range(4):
+            _make_family(db, rq.id, name=f"f{i}")
+        merged = _make_family(db, rq.id, name="gone", status="merged")
+        rq_id, merged_id = rq.id, merged.id
+    finally:
+        db.close()
+
+    state = client.get(f"/research_questions/{rq_id}/code_families/state").json()
+    assert state["cap"] == {"live_count": 4, "max_per_rq": 5, "near_cap": True, "at_cap": False}
+    assert all(f["id"] != merged_id for f in state["families"])
+    with_all = client.get(f"/research_questions/{rq_id}/code_families?include_dismissed=true").json()
+    assert any(f["id"] == merged_id for f in with_all)

@@ -8,9 +8,9 @@ from sqlalchemy.orm import Session
 
 from ..config import get_config
 from ..db import get_cortico_db, get_prototype_db
+from ..evidence_provenance import assigned_highlight_ids, evidence_row, highlight_spans
 from ..evidence_text import quoted_texts
 from ..models_prototype import (
-    ConnectionEvidence,
     ReflectionConnection,
     ReflectionConnectionRevision,
     RLHighlight,
@@ -65,14 +65,14 @@ def _starred_unassigned(
         )
         .all()
     )
-    cited_highlight_ids = {
-        e.highlight_id
-        for c in prototype_db.query(ReflectionConnection)
+    # Deterministic half of "starred highlights always appear among candidate evidence":
+    # whatever the model did, every starred highlight is either cited by one of this
+    # memo's (non-rejected) RQ connections or returned here for the user to assign.
+    assigned = assigned_highlight_ids(
+        prototype_db.query(ReflectionConnection)
         .filter(ReflectionConnection.voice_memo_id == voice_memo.id)
         .all()
-        for e in c.evidence
-        if e.highlight_id is not None
-    }
+    )
     return [
         {
             "highlight_id": h.id,
@@ -88,7 +88,7 @@ def _starred_unassigned(
             ],
         }
         for h in starred
-        if h.id not in cited_highlight_ids
+        if h.id not in assigned
     ]
 
 
@@ -158,6 +158,7 @@ def file_to_memo(
         raise HTTPException(404, "voice memo not found")
 
     now = datetime.now(timezone.utc)
+    spans = highlight_spans(prototype_db, vm.user_id, vm.conversation_id)
 
     for decision in body.decisions:
         if decision.connection_id is not None:
@@ -177,6 +178,7 @@ def file_to_memo(
                         evidence_snapshot=json.dumps(
                             [
                                 {
+                                    "highlight_id": e.highlight_id,
                                     "snippet_id": e.snippet_id,
                                     "start_index": e.start_index,
                                     "end_index": e.end_index,
@@ -199,16 +201,7 @@ def file_to_memo(
                     for e in list(connection.evidence):
                         prototype_db.delete(e)
                     for ev in decision.evidence:
-                        prototype_db.add(
-                            ConnectionEvidence(
-                                connection_id=connection.id,
-                                highlight_id=ev.highlight_id,
-                                snippet_id=ev.snippet_id,
-                                start_index=ev.start_index,
-                                end_index=ev.end_index,
-                                source=ev.source,
-                            )
-                        )
+                        prototype_db.add(evidence_row(connection.id, ev, spans, vm, prototype_db))
                 connection.status = "edited"
             else:  # accept
                 connection.status = "accepted"
@@ -227,16 +220,7 @@ def file_to_memo(
             prototype_db.add(connection)
             prototype_db.flush()
             for ev in decision.evidence or []:
-                prototype_db.add(
-                    ConnectionEvidence(
-                        connection_id=connection.id,
-                        highlight_id=ev.highlight_id,
-                        snippet_id=ev.snippet_id,
-                        start_index=ev.start_index,
-                        end_index=ev.end_index,
-                        source=ev.source,
-                    )
-                )
+                prototype_db.add(evidence_row(connection.id, ev, spans, vm, prototype_db))
 
     vm.status = "filed"
     prototype_db.commit()
