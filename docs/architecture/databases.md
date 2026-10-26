@@ -58,4 +58,7 @@ Snapshot facts the code depends on (`docs/prototype-log.md`):
   `PUT /conversations/{id}/checkpoints` upserts against it. The question must belong to the
   conversation's resolved guide.
 - Audio uploads go to `audio_dir: "db/local/audio"`, which `main.py` serves at `/audio`.
-- `db/local/exports/` is the user's hand-made backup. No code reads or writes it.
+- Backups live in `db/local/` and are written only by `backend/scripts/export_md.py`, run on the user's request:
+  - `exports/memo.md` and `exports/transcripts/*.md`, rendered from `get_memo` and the `voice_memo` rows.
+  - `exports-<date>/`: the previous export, moved aside before each run so it is never overwritten.
+  - `prototype-<YYYY-MM-DDTHHMMSS>.db`: a full copy made with SQLite's online backup, safe while the app runs. To restore one, stop the backend and copy it over `db/prototype.db`.
