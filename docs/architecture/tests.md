@@ -1,6 +1,6 @@
 # Tests
 
-Run them with `cd backend && .venv/bin/python -m pytest -q` (46 tests, about 1.5 s). They
+Run them with `cd backend && .venv/bin/python -m pytest -q` (50 tests, about 1.5 s). They
 need no network, API key or running server.
 
 ## Environment (`backend/tests/conftest.py`)
@@ -34,6 +34,7 @@ need no network, API key or running server.
 | `test_reflection_timestamp.py` | `reflection_timestamp_from_words` (a pure function) |
 | `test_review_filing.py` | `file_to_memo` is the single write point; rejected rows are kept; checkpoint upsert |
 | `test_next_steps.py` | Id validation, interest accumulation, engaged ids, accept and dismiss |
+| `test_export_md.py` | The backup script: export contents, previous export moved aside, database copy complete, backups never overwrite each other |
 | `test_code_families.py` | Validation, `_apply_family_results`, the cap, merges, `accept_merge`, 409 on a stale merge, the state endpoint |
 
 ## Which test to copy

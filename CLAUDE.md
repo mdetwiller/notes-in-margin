@@ -40,10 +40,11 @@ Every command below was run and worked on 2026-10-26.
 | Setup (frontend) | `cd frontend && npm install` |
 | Run backend | `cd backend && .venv/bin/uvicorn app.main:app --port 8000` (no `--reload`; `GET /health` → `{"ok":true}`) |
 | Run frontend | `cd frontend && npm run dev`, then open http://localhost:5173 |
-| Test | `cd backend && .venv/bin/python -m pytest -q` (46 tests, about 1.5 s) |
+| Test | `cd backend && .venv/bin/python -m pytest -q` (50 tests, about 1.5 s) |
 | Lint | `cd frontend && npm run lint` (oxlint; exits 0 with 9 existing warnings) |
 | Typecheck | `cd frontend && npx tsc -b --noEmit` |
 | Build | `cd frontend && npm run build` |
+| Back up | `cd backend && .venv/bin/python scripts/export_md.py` (Markdown export plus a SQLite copy into `db/local/`; `--no-db-backup`, `--out-dir DIR`) |
 
 - **Ports are fixed:** the backend must be on 8000 and the frontend on 5173, because `frontend/src/lib/api.ts` hard-codes `BASE = "http://localhost:8000"`, there is no Vite proxy, and CORS in `backend/app/main.py` allows only `http://localhost:5173`.
 - **What tests need:** no network, no API key (they pass with a fake `OPENAI_API_KEY` and network blocked) and no running server. They do need `acp_pipeline_snapshot.db` at the repo root, because they assert on its real data.
@@ -63,7 +64,7 @@ both sides. The shared state is local, and these rules protect it:
 | `acp_pipeline_snapshot.db` | Never write to it, because it is the source data. `cortico_engine` in `backend/app/db.py` opens it with `mode=ro&immutable=1` and `PRAGMA query_only = ON`. |
 | `db/prototype.db` | The user's real dev data. Never wipe, recreate or bulk-edit it, because it can't be regenerated. |
 | Schema changes | There are no migrations; `PrototypeBase.metadata.create_all` (in `main.py`'s lifespan) only adds missing tables. A new table only needs a name checked against `db/schema.sql`. A new or changed column on an existing table: **stop and ask the user how to migrate**, and give the column, type, default and the tables affected. |
-| `db/local/exports/` | The user's hand-made backup. Never write to it or delete it. |
+| Backups in `db/local/` | `exports/` (Markdown memo and transcripts), `exports-<date>/` (earlier exports) and `prototype-<timestamp>.db` (database copies) are the user's backups. Refresh them only when the user asks, and only with `scripts/export_md.py`, because it moves the previous export aside and never overwrites a backup. Never delete or hand-edit them. |
 | Paid OpenAI calls | `POST /voice_memos/{id}/review`, `POST /next_steps/generate`, `POST /research_questions/{rq_id}/code_families/synthesize`, `scripts/backfill_gists.py`. Ask before triggering any of them. Tests never call the model; check a live round trip by hand only with the user's go-ahead. |
 | Backfill scripts on the dev database | The user runs these. Hand off the dry run first as one line, e.g. `cd backend && .venv/bin/python scripts/backfill_evidence_highlights.py --dry-run`, say what output to expect, then give the real run. Try it first against a copy via `PROTOTYPE_DB_PATH`. |
 | `backend/.env` | Holds `OPENAI_API_KEY` and `OPENAI_BASE_URL`. Never print or open it; check by variable name only. The user edits it. |
